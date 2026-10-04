@@ -23,8 +23,17 @@ Repository: `ivancristinisod-lang/ORBITA-APP`
 
 Canonical branch: `main`
 
-Known merge baseline:
-`a0ae0a7fa7e61780eaff95381d48fb6be8807923`
+Latest hardening code baseline:
+`982eb1c2709b2bb75d7b218f68f4bc6eab3d2761`
+
+Final hardening merged before the Solana session:
+- 142 structural assertions;
+- 45 UI actions covered;
+- 23/23 tests passing;
+- build green;
+- P0/P1 known = 0;
+- Vercel deployment Ready;
+- visual QA was not executed because the connected Vercel authorization could not open the protected preview.
 
 Always run `git fetch origin` and resolve the real current `origin/main` before doing any work.
 
@@ -175,6 +184,16 @@ Prefer adding an optional stable `event_id` rather than redesigning the claim.
 The on-chain Memo remains conceptually:
 
 `orbita:v1:introduction:<sha256-digest>`
+
+### IMPORTANT — hardening audit finding
+
+Current `solana.js` has a format mismatch to resolve before wiring the real transaction:
+
+- `MEMO_PREFIX` is already `orbita:v1:introduction`;
+- `buildSolanaMemoPayload(digest, type)` appends `type` again;
+- current output is therefore `orbita:v1:introduction:introduction:<digest>`.
+
+Do **not** ignore this or silently change semantics after transaction code exists. Decide the intended canonical payload first, preserve any compatibility that actually matters, update tests intentionally, and then build the devnet transaction against that canonical format.
 
 The wallet address is already observable through transaction signing; do not duplicate sensitive context into the memo.
 
