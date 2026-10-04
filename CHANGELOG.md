@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.3 — Visual finish
+
+- Removed contextual tutorial banners from the active product.
+- Shortened first-run messaging for faster scanning.
+- Reduced oversized onboarding and HOY typography.
+- Constrained onboarding to one desktop/notebook viewport.
+- Locked document scroll while onboarding is open to avoid double scrollbars.
+- Preserved V0.6.2 activation flow and all relational/product logic.
+
+
 ## 0.6.2 — First value experience
 
 - Reduced first-run onboarding to a product choice and current goal.
