@@ -62,6 +62,16 @@ const checks = [
   [app.includes('action === "network-mode"'), "goal-aware network mode"],
   [app.includes('id="capture-draft"'), "freeform relational capture"],
   [app.includes('id="onboarding-goal-form"'), "goal-first onboarding"],
+  [app.includes('networkMode: "goal"'), "network defaults goal-first"],
+  [app.includes('data-action="open-goal-network"'), "HOY to goal-network CTA"],
+  [app.includes('data-action="network-mode" data-value="all"'), "full network fallback"],
+  [!html.includes('data-route="agenda"'), "Agenda removed from primary navigation"],
+  [!app.includes("function agendaView"), "Agenda view removed"],
+  [!app.includes("function openMeetingBrief"), "Meeting Brief UI removed"],
+  [!app.includes('data-kind="meeting"'), "meeting capture removed"],
+  [!app.includes('brief-meeting'), "meeting brief action removed"],
+  [!app.includes("LOCAL · EXPLICABLE"), "local implementation badge removed"],
+  [app.includes('Array.isArray(parsed.meetings)'), "legacy meeting backup compatibility"],
   [app.includes('networkMode: "goal"'), "goal-first network default"],
   [app.includes('action === "open-goal-network"'), "HOY goal-network navigation"],
   [app.includes('data-action="network-mode" data-value="all"'), "secondary full-network fallback"],
@@ -116,6 +126,14 @@ const routes = [...new Set((html + app).match(/data-route=\\?"([a-z0-9-]+)/g)?.m
 const allowedRoutes = new Set(["today", "people", "network", "data"]);
 const invalidRoutes = routes.filter(route => !allowedRoutes.has(route));
 if (invalidRoutes.length) throw new Error(`Invalid routes: ${invalidRoutes.join(", ")}`);
+if (routes.length !== 4 || ![...allowedRoutes].every(route => routes.includes(route))) {
+  throw new Error(`Expected exactly 4 canonical routes, got: ${routes.join(", ")}`);
+}
+
+const visibleProductCopy = html + app;
+for (const forbidden of ["LOCAL · EXPLICABLE", "LOCAL ALPHA", "SOLO NAVEGADOR", "FUNCTIONAL ALPHA · ACCESO LOCAL"]) {
+  if (visibleProductCopy.includes(forbidden)) throw new Error(`Visible implementation copy remains: ${forbidden}`);
+}
 if (routes.length !== 4 || allowedRoutes.size !== 4 || ![...allowedRoutes].every(route => routes.includes(route))) {
   throw new Error(`Canonical route check failed: expected exactly today, people, network, data; got ${routes.join(", ")}`);
 }
