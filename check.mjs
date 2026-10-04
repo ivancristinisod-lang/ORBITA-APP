@@ -98,6 +98,7 @@ const checks = [
   [app.includes('data-action="anchor-solana"'), "Solana anchor action"],
   [app.includes('data-action="verify-solana"'), "Solana verification action"],
   [solanaClient.includes('chain: "solana:devnet"'), "Wallet Standard devnet enforcement"],
+  [solanaClient.includes("function waitForConfirmation") && solanaClient.includes("confirmation timeout"), "Solana confirmation polling"],
   [vercel.includes("https://api.devnet.solana.com"), "exact Solana devnet CSP origin"],
   [auth.includes('/token?grant_type=password'), "password auth"],
   [auth.includes('/recover'), "password recovery"],
