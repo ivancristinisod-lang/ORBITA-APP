@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.1 — Product simplification patch
+
+- Removed Agenda from the active product navigation and frontend surface.
+- Removed Meeting Brief, meeting capture/edit handlers and meeting-specific presentation code.
+- Preserved `meetings[]` only for legacy workspace/backups compatibility; no destructive migration.
+- Removed implementation-facing “LOCAL” language from product branding and entry UI.
+- Made RED goal-first when a current goal exists.
+- Added a dedicated HOY → RED goal-mode action and a no-goal empty state.
+- Preserved full-network exploration as a secondary fallback.
+- Renamed the secondary opportunity CTA from PREPARAR ACCIÓN to ABRIR RELACIÓN.
+- Replaced PERSONAS pseudo-button rows with semantic accessible buttons.
+- Updated checks to enforce exactly four canonical routes and the V0.6.1 product contract.
+- Removed dead Agenda/meeting presentation CSS.
 ## 0.6.0 — Relational experience upgrade
 
 - Rebuilt HOY around the current goal, explainable ranking and a prioritized attention queue.
