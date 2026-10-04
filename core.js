@@ -28,71 +28,92 @@ export function daysBetween(a, b) {
   return Math.round((two - one) / 86400000);
 }
 
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function asText(value, fallback = "") {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return fallback;
+}
+
+function boundedNumber(value, fallback, min, max = Number.POSITIVE_INFINITY) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, number));
+}
+
+function recordList(value) {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
 export function normalizeStore(input) {
-  const source = input && typeof input === "object" ? input : {};
+  const source = isRecord(input) ? input : {};
+  const profile = isRecord(source.profile) ? source.profile : {};
   return {
     schemaVersion: SCHEMA_VERSION,
     profile: {
-      name: source.profile?.name || "Mi espacio",
-      role: source.profile?.role || "Founder",
-      focus: source.profile?.focus || "Networking profesional",
-      currentGoal: String(source.profile?.currentGoal || "").slice(0, 280),
-      onboardingComplete: Boolean(source.profile?.onboardingComplete),
-      goals: Array.isArray(source.profile?.goals) ? source.profile.goals.filter(Boolean).slice(0, 8) : [],
-      defaultCadenceDays: Math.max(1, Math.min(365, Number(source.profile?.defaultCadenceDays || 30)))
+      name: asText(profile.name, "Mi espacio") || "Mi espacio",
+      role: asText(profile.role, "Founder") || "Founder",
+      focus: asText(profile.focus, "Networking profesional") || "Networking profesional",
+      currentGoal: asText(profile.currentGoal).slice(0, 280),
+      onboardingComplete: Boolean(profile.onboardingComplete),
+      goals: Array.isArray(profile.goals) ? profile.goals.map(goal => asText(goal).trim()).filter(Boolean).slice(0, 8) : [],
+      defaultCadenceDays: boundedNumber(profile.defaultCadenceDays, 30, 1, 365)
     },
-    people: Array.isArray(source.people) ? source.people.map(p => ({
-      id: p.id || makeId("p"),
-      name: p.name || "Sin nombre",
-      role: p.role || "",
-      company: p.company || "",
-      city: p.city || "",
-      email: p.email || "",
-      phone: p.phone || "",
-      linkedin: p.linkedin || "",
+    people: recordList(source.people).map(p => ({
+      id: asText(p.id).trim() || makeId("p"),
+      name: asText(p.name, "Sin nombre").trim() || "Sin nombre",
+      role: asText(p.role),
+      company: asText(p.company),
+      city: asText(p.city),
+      email: asText(p.email),
+      phone: asText(p.phone),
+      linkedin: asText(p.linkedin),
       circle: ["Cercano", "Estratégico", "Activo", "Nuevo"].includes(p.circle) ? p.circle : "Activo",
-      cadenceDays: Math.max(1, Number(p.cadenceDays || 30)),
-      nextFollowUp: p.nextFollowUp || "",
-      relation: p.relation || "",
-      notes: p.notes || "",
-      tags: Array.isArray(p.tags) ? p.tags.filter(Boolean) : [],
-      createdAt: p.createdAt || new Date().toISOString()
-    })) : [],
-    interactions: Array.isArray(source.interactions) ? source.interactions.map(i => ({
-      id: i.id || makeId("i"),
-      personId: i.personId || "",
-      date: i.date || new Date().toISOString(),
-      type: i.type || "Nota",
-      title: i.title || "Interacción",
-      notes: i.notes || "",
+      cadenceDays: boundedNumber(p.cadenceDays, 30, 1, 365),
+      nextFollowUp: asText(p.nextFollowUp),
+      relation: asText(p.relation),
+      notes: asText(p.notes),
+      tags: Array.isArray(p.tags) ? p.tags.map(tag => asText(tag).trim()).filter(Boolean) : [],
+      createdAt: asText(p.createdAt) || new Date().toISOString()
+    })),
+    interactions: recordList(source.interactions).map(i => ({
+      id: asText(i.id).trim() || makeId("i"),
+      personId: asText(i.personId).trim(),
+      date: asText(i.date) || new Date().toISOString(),
+      type: asText(i.type, "Nota") || "Nota",
+      title: asText(i.title, "Interacción") || "Interacción",
+      notes: asText(i.notes),
       source: "manual"
-    })) : [],
-    commitments: Array.isArray(source.commitments) ? source.commitments.map(c => ({
-      id: c.id || makeId("c"),
-      personId: c.personId || "",
-      title: c.title || "Compromiso",
-      dueDate: c.dueDate || "",
+    })),
+    commitments: recordList(source.commitments).map(c => ({
+      id: asText(c.id).trim() || makeId("c"),
+      personId: asText(c.personId).trim(),
+      title: asText(c.title, "Compromiso") || "Compromiso",
+      dueDate: asText(c.dueDate),
       status: c.status === "done" ? "done" : "open",
-      createdAt: c.createdAt || new Date().toISOString()
-    })) : [],
-    opportunities: Array.isArray(source.opportunities) ? source.opportunities.map(o => ({
-      id: o.id || makeId("o"),
-      personId: o.personId || "",
-      title: o.title || "Oportunidad",
+      createdAt: asText(c.createdAt) || new Date().toISOString()
+    })),
+    opportunities: recordList(source.opportunities).map(o => ({
+      id: asText(o.id).trim() || makeId("o"),
+      personId: asText(o.personId).trim(),
+      title: asText(o.title, "Oportunidad") || "Oportunidad",
       stage: ["Idea", "Explorando", "Activa", "Cerrada"].includes(o.stage) ? o.stage : "Idea",
-      notes: o.notes || "",
-      createdAt: o.createdAt || new Date().toISOString()
-    })) : [],
-    meetings: Array.isArray(source.meetings) ? source.meetings.map(m => ({
-      id: m.id || makeId("m"),
-      personId: m.personId || "",
-      title: m.title || "Reunión",
-      start: m.start || new Date().toISOString(),
-      durationMin: Math.max(5, Number(m.durationMin || 30)),
-      notes: m.notes || "",
+      notes: asText(o.notes),
+      createdAt: asText(o.createdAt) || new Date().toISOString()
+    })),
+    meetings: recordList(source.meetings).map(m => ({
+      id: asText(m.id).trim() || makeId("m"),
+      personId: asText(m.personId).trim(),
+      title: asText(m.title, "Reunión") || "Reunión",
+      start: asText(m.start) || new Date().toISOString(),
+      durationMin: boundedNumber(m.durationMin, 30, 5),
+      notes: asText(m.notes),
       status: m.status === "done" ? "done" : "upcoming"
-    })) : [],
-    updatedAt: source.updatedAt || new Date().toISOString()
+    })),
+    updatedAt: asText(source.updatedAt) || new Date().toISOString()
   };
 }
 
@@ -463,7 +484,7 @@ export function formatRelative(value, now = new Date()) {
 
 export function csvEscape(value) {
   let str = String(value ?? "");
-  if (/^[=+\-@]/.test(str)) str = `'${str}`;
+  if (/^[\t\r ]*[=+\-@]/.test(str)) str = `'${str}`;
   return /[",\n]/.test(str) ? `"${str.replaceAll('"', '""')}"` : str;
 }
 
@@ -485,7 +506,6 @@ export function reportToMarkdown(store, now = new Date()) {
     `Personas: ${store.people.length}`,
     `Interacciones registradas: ${store.interactions.length}`,
     `Compromisos abiertos: ${store.commitments.filter(c => c.status !== "done").length}`,
-    `Reuniones próximas: ${upcomingMeetings(store, now).length}`,
     "",
     "## Personas"
   ];
