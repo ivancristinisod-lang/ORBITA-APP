@@ -116,3 +116,18 @@ test("Markdown report keeps legacy meetings out of the active product report",()
   assert.doesNotMatch(md,/Reuniones próximas/i);
   assert.match(md,/Ana Test/);
 });
+
+
+test("relational evidence attributes the actual supporting source",()=>{
+  const crafted=normalizeStore({
+    people:[{id:"p1",name:"Alex",role:"Founder",company:"Studio",circle:"Estratégico",relation:"Nos conocemos por comunidad",tags:["Producto"],cadenceDays:30}],
+    interactions:[{id:"i1",personId:"p1",date:"2026-10-03T12:00:00Z",type:"Mensaje",title:"Charlamos",notes:"Me contó que trabaja con un investor interesado en startups."}],
+    commitments:[],
+    opportunities:[],
+    meetings:[]
+  });
+  const [result]=buildRelationalOpportunities(crafted,"Estoy levantando una ronda pre-seed",new Date("2026-10-04T12:00:00Z"));
+  assert.ok(result);
+  assert.ok(result.evidence.some(item=>item.source==="interacción"&&/investor/i.test(item.text)));
+  assert.equal(result.evidence.some(item=>item.source==="perfil"&&/señales directas vinculadas/i.test(item.text)),false);
+});
