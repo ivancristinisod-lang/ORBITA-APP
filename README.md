@@ -8,7 +8,7 @@ Convierte un objetivo actual + el contexto registrado de tu red en oportunidades
 
 ## Estado actual
 
-**Versión:** V0.6.2 First Value Experience  
+**Versión:** V0.6.3 Visual Finish  
 **Arquitectura:** local-first, backend-ready  
 **Deploy:** Vercel  
 **Producción:** https://orbita-app-kappa.vercel.app
@@ -22,12 +22,20 @@ ORBITA tiene **4 superficies canónicas**:
 3. **RED** — abre por objetivo cuando existe uno; la red completa queda como vista secundaria.
 4. **DATOS** — información, sistema, cuenta, import/export y herramientas avanzadas.
 
+### V0.6.3
+
+- Tutoriales contextuales removidos para reducir ruido visual.
+- Onboarding compacto y diseñado para entrar completo en un viewport desktop/notebook.
+- Scroll del documento bloqueado durante onboarding para evitar doble barra.
+- Copy inicial reducido a una promesa escaneable.
+- Escala tipográfica de onboarding y HOY moderada para priorizar contenido y acciones.
+- Se preservan demo inmediata, objetivo primero, empty states y toda la lógica de producto.
+
 ### V0.6.2
 
 - Onboarding reducido a una elección inicial + objetivo.
 - Demo inmediata en un click para llegar al valor central sin configuración previa.
 - Nombre, rol y proyecto dejan de bloquear la primera sesión.
-- Ayudas contextuales pequeñas y descartables en HOY, PERSONAS, RED y DATOS.
 - Empty states orientados a acción: agregar una relación o importar CSV.
 - Más respiración horizontal y vertical en desktop sin sacrificar mobile.
 - Motor relacional, CRUD, persistencia y arquitectura permanecen sin cambios.
