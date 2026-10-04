@@ -1,11 +1,27 @@
 # ORBITA — Project Status
 
-**Product generation:** V0.5  
-**Patch:** 0.5.2 — Local Alpha Stage Gate  
-**Stage:** Productized High-Fidelity Prototype → Functional Alpha / Pre-MVP  
+**Product generation:** V0.6  
+**Patch:** 0.6.0 — Experience Upgrade release candidate  
+**Stage:** Functional Alpha / Pre-MVP → Experience validation  
 **Frontend:** Vercel  
 **Backend-ready:** Supabase ORBITA (`sa-east-1`), desacoplado hasta activación  
 **Primary user:** founders / entrepreneurs
+
+## V0.6 Experience Upgrade
+
+- [x] Objetivo actual convertido en primitiva central de HOY
+- [x] Ranking explicable con #1 dominante
+- [x] Cola priorizada “Necesita tu atención”
+- [x] Evidence drawer con hecho / inferencia / acción diferenciados
+- [x] PERSONAS reducida a relaciones escaneables
+- [x] Detalle como historia longitudinal
+- [x] RED con modo MI RED / POR OBJETIVO
+- [x] AGENDA relation-first y mobile list-first
+- [x] DATOS agrupado en Información / Sistema / Cuenta / Avanzado
+- [x] Captura libre “¿Qué pasó?” + CRUD estructurado
+- [x] Onboarding reducido a tres etapas
+- [x] Design system y responsive pass V0.6
+- [ ] CI / preview / visual QA final antes de merge
 
 ## Producto utilizable hoy
 
@@ -35,7 +51,7 @@
 - [x] Security Advisor: 0 findings en última auditoría
 - [x] Performance Advisor: 0 findings en última auditoría
 
-## Stage Gate V0.5
+## Stage Gate V0.6
 
 ORBITA corre por defecto como **LOCAL ALPHA**. Variables parciales de backend no pueden romper el deploy.
 
@@ -77,4 +93,4 @@ junto a URL + publishable key válidas.
 
 ## Prioridad #1
 
-**Usar ORBITA como producto funcional, terminar convergencia UX y preparar la primera prueba real con usuarios antes de ampliar el scope.**
+**Validar V0.6 con usuarios reales, observar comprensión/retorno y corregir experiencia antes de ampliar integraciones o infraestructura.**
