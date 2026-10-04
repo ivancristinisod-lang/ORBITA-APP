@@ -106,7 +106,7 @@ test("CSV export neutralizes spreadsheet formulas even after leading whitespace"
     people:[{id:"p1",name:"\t=CMD|x",role:" @SUM(1+1)",company:"+1+1",circle:"Activo"}]
   });
   const csv=peopleToCSV(dangerous);
-  assert.match(csv,/'\t=CMD\|x/);
+  assert.match(csv,/'=CMD\|x/);
   assert.match(csv,/' @SUM\(1\+1\)/);
   assert.match(csv,/"?'\+1\+1"?/);
 });
