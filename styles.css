@@ -504,3 +504,96 @@ body:before{opacity:.1;background:radial-gradient(circle at 12% 8%,rgba(220,255,
   .network-goal-empty{min-height:calc(100vh - 180px);padding:28px 14px;border-left:0;border-right:0}
   .network-goal-empty h2{font-size:42px}
 }
+
+
+/* =========================================================
+   ORBITA V0.6.2 — FIRST VALUE EXPERIENCE
+   Lower friction, contextual guidance, more editorial air.
+   ========================================================= */
+:root{--content-max:1480px}
+.view{max-width:var(--content-max);padding:26px clamp(30px,4vw,58px) 68px}
+.page-head{margin-bottom:36px}
+.goal-intelligence{margin-bottom:42px}
+.attention-section{margin:44px 0 42px}
+.today-secondary{margin-top:18px}
+.v06-people-toolbar{margin-bottom:14px}
+.v06-filter-chips{margin-bottom:14px}
+.v06-people-list{margin-bottom:16px}
+.v06-import-strip{margin-top:16px}
+.network-command{margin-bottom:18px}
+.network-v06-layout{gap:18px}
+.v06-data-layout{gap:28px}
+
+/* Contextual tutorial signs */
+.tutorial-tip{position:relative;display:grid;grid-template-columns:32px minmax(0,1fr) 28px;gap:12px;align-items:start;max-width:920px;margin:0 0 28px;padding:13px 14px 13px 12px;border:1px solid #30342d;border-left:2px solid var(--cobalt);background:linear-gradient(90deg,rgba(39,71,255,.055),rgba(13,15,13,.65));box-shadow:0 14px 40px rgba(0,0,0,.12)}
+.tutorial-tip-mark{width:30px;height:30px;display:grid;place-items:center;border:1px solid #3d477a;color:#8fa0ff;background:rgba(39,71,255,.06)}
+.tutorial-tip-copy{display:grid;gap:3px;min-width:0}
+.tutorial-tip-copy strong{font-size:11px;color:#e5dfd4}
+.tutorial-tip-copy p{margin:0;max-width:760px;font-size:10px;line-height:1.55;color:#858a80}
+.tutorial-tip-close{width:26px;height:26px;display:grid;place-items:center;background:transparent;border:0;color:#666b62;cursor:pointer}
+.tutorial-tip-close:hover{color:var(--ivory)}
+.tutorial-inline-action{justify-self:start;margin-top:4px;padding:0;background:transparent;color:#9da8ff;font-size:9px;letter-spacing:.07em;cursor:pointer}
+
+/* First value onboarding */
+.v062-onboard-shell{width:min(1120px,100%);min-height:680px;overflow:hidden;background:
+  radial-gradient(circle at 88% 14%,rgba(39,71,255,.10),transparent 28%),
+  radial-gradient(circle at 18% 92%,rgba(220,255,0,.045),transparent 24%),
+  linear-gradient(145deg,#11120f,#0b0c0a)}
+.v062-onboard-hero{padding:clamp(32px,5vw,70px);display:grid;align-content:center}
+.v062-onboard-hero .onboard-hero-copy{max-width:970px}
+.v062-onboard-hero h1{max-width:980px;margin:10px 0 18px;font:900 clamp(42px,5.9vw,76px)/.9 var(--cond);letter-spacing:-.026em;text-transform:none;color:var(--ivory);text-wrap:balance}
+.v062-onboard-hero .onboard-hero-copy>p{max-width:720px;margin:0;color:#93978d;font-size:14px;line-height:1.65}
+.v062-onboard-loop{margin:24px 0 28px}
+.onboard-choice-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;max-width:900px}
+.onboard-choice-card{min-height:174px;padding:20px;border:1px solid #33372f;background:#0b0d0b;display:grid;align-content:start;gap:8px;text-align:left;cursor:pointer;transition:transform .18s ease,border-color .18s ease,background .18s ease}
+.onboard-choice-card:hover{transform:translateY(-2px);border-color:#555b4e;background:#10130e}
+.onboard-choice-card.primary{border-color:#73800d;background:linear-gradient(145deg,rgba(220,255,0,.075),rgba(11,13,11,.98))}
+.choice-kicker{font-size:8px;letter-spacing:.12em;color:#70766b;font-weight:800}
+.onboard-choice-card.primary .choice-kicker{color:var(--acid-v06)}
+.onboard-choice-card strong{font:900 25px/.95 var(--cond);letter-spacing:-.01em;color:#eee7db}
+.onboard-choice-card p{margin:0;max-width:420px;color:#858a80;font-size:11px;line-height:1.55}
+.onboard-choice-card b{margin-top:auto;font-size:9px;letter-spacing:.08em;color:#a6b0ff}
+.onboard-choice-card.primary b{color:var(--acid-v06)}
+.onboard-reassurance{display:block;margin-top:14px;color:#676c63;font-size:9px}
+.v062-goal-onboarding{padding:clamp(34px,7vw,82px);max-width:950px}
+.v062-goal-onboarding h2{margin-bottom:14px;font-size:clamp(42px,6vw,66px);text-transform:none}
+.v062-goal-onboarding>p{max-width:680px;font-size:13px}
+.v062-goal-onboarding .onboard-goal-field textarea{min-height:142px;margin-top:18px}
+.onboard-value-preview{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:7px;align-items:stretch;margin:18px 0 4px}
+.onboard-value-preview>span{grid-column:1/-1;font-size:8px;letter-spacing:.11em;color:#676c63}
+.onboard-value-preview>div{min-height:62px;border-top:1px solid #30342d;padding:9px 4px;color:#858a80;font-size:10px;line-height:1.4}
+.onboard-value-preview b{display:block;margin-bottom:4px;color:var(--acid-v06);font:800 16px var(--cond)}
+.v062-empty{max-width:760px;margin:72px auto;text-align:left;padding:44px}
+.v062-empty .onboarding-mark{margin-bottom:14px}
+.v062-empty h2{margin:10px 0 8px;font-size:38px;text-transform:none}
+.v062-empty p{max-width:560px;line-height:1.6}
+.empty-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px}
+
+@media(max-width:1100px){
+  .view{padding-left:28px;padding-right:28px}
+}
+@media(max-width:760px){
+  .view{padding:14px 14px 40px}
+  .page-head{margin-bottom:24px}
+  .tutorial-tip{grid-template-columns:28px minmax(0,1fr) 26px;margin-bottom:20px}
+  .onboard-choice-grid{grid-template-columns:1fr}
+  .onboard-choice-card{min-height:142px}
+  .onboard-value-preview{grid-template-columns:1fr}
+  .onboard-value-preview>span{grid-column:auto}
+  .v062-onboard-hero{padding:30px 20px}
+  .v062-onboard-hero h1{font-size:44px}
+  .v062-goal-onboarding{padding:30px 20px}
+  .v062-empty{margin:30px auto;padding:28px 20px}
+  .v062-empty h2{font-size:34px}
+}
+@media(max-width:430px){
+  .tutorial-tip{grid-template-columns:1fr 24px}
+  .tutorial-tip-mark{display:none}
+  .tutorial-tip-copy{grid-column:1}
+  .tutorial-tip-close{grid-column:2;grid-row:1}
+  .empty-actions{display:grid}
+  .empty-actions .btn{width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  .onboard-choice-card{transition:none!important}
+}

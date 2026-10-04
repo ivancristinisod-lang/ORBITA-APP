@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2 — First value experience
+
+- Reduced first-run onboarding to a product choice and current goal.
+- Added one-click demo entry with a prepared relational goal.
+- Deferred name/role/project setup until after first value.
+- Added contextual, individually dismissible tutorial signs across core surfaces.
+- Added action-oriented empty states for first relationship / CSV import.
+- Increased desktop spacing and side margins while preserving compact mobile layouts.
+- Kept relational engine, CRUD, persistence, Supabase and Solana scope unchanged.
+
 ## 0.6.1 — Product simplification patch
 
 - Removed Agenda from the active product navigation and frontend surface.
