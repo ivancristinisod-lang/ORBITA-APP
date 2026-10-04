@@ -7,6 +7,10 @@ import {
 } from "./core.js";
 import { bootstrapAuth, cloudIsConfigured, hydrateUser, requestPasswordReset, signIn, signOut, signUp, updatePassword, useLocalMode } from "./auth.js";
 import { CloudConflictError, deleteCloudAccount, loadCloudWorkspace, saveCloudWorkspace, testCloudConnection } from "./cloud.js";
+import {
+  assertAttestationReceipt, buildSolanaMemoPayload, canonicalRelationalClaim,
+  hashRelationalClaim, solanaExplorerUrl, verifyFetchedAttestation
+} from "./solana.js";
 
 const LEGACY_STORAGE_KEY = "orbita.store.v2";
 const STORAGE_PREFIX = "orbita.store.v3";
@@ -34,6 +38,7 @@ let authSession = null;
 let authRecovery = false;
 let syncTimer = null;
 let syncStatus = "local";
+const solanaUi = new Map();
 let cloudRevision = null;
 let store = normalizeStore({});
 
@@ -539,12 +544,80 @@ function dataView(){
 
 function relationshipTimeline(person){
   const items=[
-    ...interactionsFor(store,person.id).map(i=>({date:i.date,label:"INTERACCIÓN",title:i.title,body:i.notes||i.type,action:"edit-interaction",id:i.id,tone:"human"})),
+    ...interactionsFor(store,person.id).map(i=>({date:i.date,label:"INTERACCIÓN",title:i.title,body:i.notes||i.type,action:"edit-interaction",id:i.id,tone:"human",interaction:i})),
     ...store.commitments.filter(c=>c.personId===person.id).map(c=>({date:c.dueDate||c.createdAt||"",label:"COMPROMISO",title:c.title,body:c.status==="done"?"Cumplido":"Pendiente",action:"edit-commitment",id:c.id,tone:c.status==="done"?"done":"commitment"})),
     ...store.opportunities.filter(o=>o.personId===person.id).map(o=>({date:o.createdAt||"",label:"OPORTUNIDAD",title:o.title,body:[o.stage,o.notes].filter(Boolean).join(" · "),action:"edit-opportunity",id:o.id,tone:"opportunity"}))
   ].filter(item=>item.date).sort((a,b)=>new Date(b.date)-new Date(a.date));
   if(!items.length)return `<p class="muted-copy">Todavía no hay historia registrada.</p>`;
-  return `<div class="relationship-timeline">${items.map(item=>`<button class="relationship-event ${item.tone}" data-action="${item.action}" data-id="${esc(item.id)}"><span class="relationship-event-date">${esc(formatDate(item.date))}</span><i></i><span class="relationship-event-copy"><small>${esc(item.label)}</small><strong>${esc(item.title)}</strong><span>${esc(item.body||"")}</span></span>${icon("arrow",13)}</button>`).join("")}</div>`;
+  return `<div class="relationship-timeline">${items.map(item=>{
+    const row=`<button class="relationship-event ${item.tone}" data-action="${item.action}" data-id="${esc(item.id)}"><span class="relationship-event-date">${esc(formatDate(item.date))}</span><i></i><span class="relationship-event-copy"><small>${esc(item.label)}</small><strong>${esc(item.title)}</strong><span>${esc(item.body||"")}</span></span>${icon("arrow",13)}</button>`;
+    return item.interaction?.type === "Introducción" ? `<article class="introduction-proof">${row}${solanaAttestationPanel(item.interaction)}</article>` : row;
+  }).join("")}</div>`;
+}
+
+function solanaAttestationPanel(interaction){
+  const attestation=interaction.solanaAttestation;
+  const runtime=solanaUi.get(interaction.id);
+  if(runtime?.error)return `<div class="solana-proof error"><span>PRUEBA DEVNET · ERROR</span><p>${esc(runtime.error)}</p><button class="text-btn" data-action="anchor-solana" data-id="${esc(interaction.id)}">REINTENTAR</button></div>`;
+  if(runtime?.state){const labels={connecting:"CONECTAR WALLET",preparing:"PREPARANDO",signing:"ESPERANDO FIRMA",sending:"ENVIANDO",confirming:"CONFIRMANDO",verifying:"VERIFICANDO"};return `<div class="solana-proof pending"><span>PRUEBA DEVNET</span><strong>${esc(labels[runtime.state]||"PREPARANDO")}</strong></div>`;}
+  if(!attestation)return `<div class="solana-proof"><span>PRUEBA DEVNET · NO ANCLADO</span><button class="text-btn" data-action="anchor-solana" data-id="${esc(interaction.id)}">ANCLAR EN SOLANA</button></div>`;
+  const explorer=solanaExplorerUrl(attestation.signature);
+  return `<div class="solana-proof confirmed"><span>PRUEBA DEVNET</span><strong>${attestation.verificationStatus==="verified"?"VERIFICADO":"CONFIRMADO EN DEVNET"}</strong><div class="solana-proof-actions"><a class="text-btn" href="${esc(explorer)}" target="_blank" rel="noopener noreferrer">VER EN EXPLORER</a><button class="text-btn" data-action="verify-solana" data-id="${esc(interaction.id)}">VERIFICAR PRUEBA</button></div></div>`;
+}
+
+function refreshInteractionPerson(interaction){
+  if(drawerShell.classList.contains("open"))openPersonDrawer(interaction.personId);
+}
+
+async function chooseSolanaWallet(client){
+  const wallets=await client.listWallets();
+  if(!wallets.length)throw new Error("No encontramos una browser wallet compatible con Wallet Standard. Instalá Phantom, Solflare o Backpack y reintentá.");
+  if(wallets.length===1)return wallets[0].name;
+  const choice=prompt(`Elegí una wallet de Solana Devnet:\n${wallets.map((wallet,index)=>`${index+1}. ${wallet.name}`).join("\n")}`);
+  if(!choice)throw new Error("No elegiste una wallet.");
+  const byIndex=wallets[Number(choice)-1];
+  const selected=byIndex||wallets.find(wallet=>wallet.name.toLowerCase()===choice.trim().toLowerCase());
+  if(!selected)throw new Error("La wallet elegida no está disponible.");
+  return selected.name;
+}
+
+async function anchorInteractionOnSolana(interactionId){
+  const interaction=store.interactions.find(item=>item.id===interactionId);
+  if(!interaction||interaction.type!=="Introducción"||interaction.solanaAttestation)return;
+  if(solanaUi.get(interactionId)?.state)return;
+  solanaUi.set(interactionId,{state:"connecting"});refreshInteractionPerson(interaction);
+  try{
+    const client=await import("/solana-client.js");
+    const walletName=await chooseSolanaWallet(client);
+    let digest="";
+    const receipt=await client.attestMemo({walletName,onState:state=>{solanaUi.set(interactionId,{state});refreshInteractionPerson(interaction);},buildMemo:async wallet=>{
+      const claim=canonicalRelationalClaim({actorId:wallet,targetId:interaction.personId,eventId:interaction.id,type:"introduction"});
+      digest=await hashRelationalClaim(claim);
+      return buildSolanaMemoPayload(digest,"introduction");
+    }});
+    assertAttestationReceipt({...receipt,digest});
+    interaction.solanaAttestation={cluster:"devnet",signature:receipt.signature,digest,wallet:receipt.wallet,memo:receipt.memo,attestedAt:new Date().toISOString(),verificationStatus:"unverified"};
+    solanaUi.delete(interactionId);
+    const persisted=saveStore("Confirmado en Solana Devnet");
+    refreshInteractionPerson(interaction);
+    if(!persisted)toast(`La transacción fue confirmada (${receipt.signature.slice(0,8)}…), pero no pudimos guardar el recibo. Abrí Explorer antes de salir.`,"warn");
+  }catch(error){solanaUi.set(interactionId,{error:error.message||"No pudimos completar la transacción."});refreshInteractionPerson(interaction);}
+}
+
+async function verifyInteractionOnSolana(interactionId){
+  const interaction=store.interactions.find(item=>item.id===interactionId),attestation=interaction?.solanaAttestation;
+  if(!interaction||!attestation)return;
+  solanaUi.set(interactionId,{state:"verifying"});refreshInteractionPerson(interaction);
+  try{
+    const claim=canonicalRelationalClaim({actorId:attestation.wallet,targetId:interaction.personId,eventId:interaction.id,type:"introduction"});
+    const digest=await hashRelationalClaim(claim);
+    const memo=buildSolanaMemoPayload(digest,"introduction");
+    if(digest!==attestation.digest||memo!==attestation.memo)throw new Error("Los datos locales ya no coinciden con la prueba.");
+    const client=await import("/solana-client.js");
+    const evidence=await client.fetchAttestationEvidence(attestation.signature);
+    if(!verifyFetchedAttestation({...evidence,...attestation}))throw new Error("La transacción no coincide con el Memo esperado.");
+    attestation.verificationStatus="verified";solanaUi.delete(interactionId);saveStore("Prueba verificada en Solana Devnet");refreshInteractionPerson(interaction);
+  }catch(error){attestation.verificationStatus="unverified";solanaUi.set(interactionId,{error:`NO VERIFICADO · ${error.message||"Reintentá en unos instantes."}`});refreshInteractionPerson(interaction);}
 }
 
 function openPersonDrawer(personId) {
@@ -690,7 +763,7 @@ function openEntityForm(kind, id = "", presetPersonId = "") {
     const entity = id ? store.interactions.find(x => x.id === id) : null;
     html = formShell(kind, entity ? "Editar interacción" : "Registrar interacción", "Una buena memoria relacional empieza por registrar qué pasó, no por escribir mucho.", `<div class="form-grid">
       ${personSelectField(entity?.personId || presetPersonId)}
-      ${selectField("Tipo", "type", ["Reunión", "Mensaje", "Llamada", "Café", "Evento", "Nota"], entity?.type || "Reunión")}
+      ${selectField("Tipo", "type", ["Reunión", "Introducción", "Mensaje", "Llamada", "Café", "Evento", "Nota"], entity?.type || "Reunión")}
       ${field("Fecha y hora", "date", localDateTime(entity?.date || new Date().toISOString()), { type: "datetime-local", required: true })}
       ${field("Título", "title", entity?.title || "", { required: true, wide: true, placeholder: "Qué pasó en una frase" })}
       ${textareaField("Notas", "notes", entity?.notes || "", "Decisiones, contexto, temas o próximos pasos.")}
@@ -734,7 +807,8 @@ function submitEntityForm(form) {
     };
     if (id) store.people = store.people.map(p => p.id === id ? payload : p); else store.people.push(payload);
   } else if (kind === "interaction") {
-    const payload = { id: id || makeId("i"), personId: data.personId, type: data.type, date: new Date(data.date).toISOString(), title: data.title.trim(), notes: data.notes.trim(), source: "manual" };
+    const previous=id?store.interactions.find(x=>x.id===id):null;
+    const payload = { id: id || makeId("i"), personId: data.personId, type: previous?.solanaAttestation ? "Introducción" : data.type, date: new Date(data.date).toISOString(), title: data.title.trim(), notes: data.notes.trim(), source: "manual", ...(previous?.solanaAttestation?{solanaAttestation:previous.solanaAttestation}:{}) };
     if (id) store.interactions = store.interactions.map(x => x.id === id ? payload : x); else store.interactions.push(payload);
   } else if (kind === "commitment") {
     const payload = { id: id || makeId("c"), personId: data.personId, title: data.title.trim(), dueDate: data.dueDate || "", status: data.status, createdAt: id ? store.commitments.find(x=>x.id===id)?.createdAt : new Date().toISOString() };
@@ -1079,6 +1153,8 @@ async function handleAction(target) {
   else if (action === "open-person") openPersonDrawer(id);
   else if (action === "edit-person") openEntityForm("person", id);
   else if (action === "edit-interaction") openEntityForm("interaction", id);
+  else if (action === "anchor-solana") await anchorInteractionOnSolana(id);
+  else if (action === "verify-solana") await verifyInteractionOnSolana(id);
   else if (action === "edit-commitment") openEntityForm("commitment", id);
   else if (action === "edit-opportunity") openEntityForm("opportunity", id);
   else if (action === "agent-opportunity") openAgentOpportunity(id);

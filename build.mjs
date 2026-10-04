@@ -1,5 +1,6 @@
 import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { build as bundle } from "esbuild";
 
 const root = process.cwd();
 const out = path.join(root, "dist");
@@ -61,6 +62,19 @@ await mkdir(path.join(out, "assets"), { recursive: true });
 for (const file of publicFiles) await cp(path.join(root, file), path.join(out, file));
 await cp(path.join(root, "orbita-mark.svg"), path.join(out, "assets", "orbita-mark.svg"));
 await cp(path.join(root, "orbita-logo.png"), path.join(out, "assets", "orbita-logo.png"));
+const solanaEntry = await readFile(path.join(root, "solana-client.entry.js"), "utf8");
+await bundle({
+  absWorkingDir: root,
+  nodePaths: [path.join(root, "node_modules")],
+  stdin: { contents: solanaEntry, resolveDir: root, sourcefile: "solana-client.entry.js", loader: "js" },
+  outfile: "dist/solana-client.js",
+  bundle: true,
+  format: "esm",
+  platform: "browser",
+  target: ["es2022"],
+  minify: true,
+  legalComments: "none"
+});
 
 const replacements = {
   "__ORBITA_SUPABASE_URL__": cloud.url || "__ORBITA_SUPABASE_URL__",

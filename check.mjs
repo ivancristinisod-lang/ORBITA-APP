@@ -5,7 +5,7 @@ import path from "node:path";
 const root = process.cwd();
 const required = [
   "index.html", "styles.css", "app.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "orbita-mark.svg", "orbita-logo.png",
-  "vercel.json", "package.json", "README.md", "PROJECT_STATUS.md", "QA-REPORT.md", "ORBITA_CANON_V0.5.md", "ORBITA_CANON_V0.6.1.md", "CODEX_TOMORROW_HANDOFF.md",
+  "vercel.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "README.md", "PROJECT_STATUS.md", "QA-REPORT.md", "ORBITA_CANON_V0.5.md", "ORBITA_CANON_V0.6.1.md", "CODEX_TOMORROW_HANDOFF.md",
   "AUTH-SETUP.md", "SECURITY.md", "AUDIT-REPORT-V0.5.md", ".env.example",
   "supabase/schema.sql",
   "supabase/migrations/20260815153417_orbita_v05_hardened_workspace.sql",
@@ -13,14 +13,15 @@ const required = [
   "supabase/migrations/20260815153845_orbita_v05_server_fields_and_revision.sql",
   "supabase/functions/delete-account/index.ts",
   "ARCHITECTURE-DECISIONS.md", "PRODUCT-STAGE.md", "ORBITA_V0.6_EXPERIENCE.md",
-  "solana.js", "CHANGELOG_HACKATHON.md", "DEMO.md", "ARCHITECTURE_HACKATHON.md", "SECURITY_HACKATHON.md",
+  "solana.js", "solana-client.entry.js", "CHANGELOG_HACKATHON.md", "DEMO.md", "ARCHITECTURE_HACKATHON.md", "SECURITY_HACKATHON.md",
   ".github/workflows/validate.yml"
 ];
 for (const file of required) await access(path.join(root, file));
 
 const read = file => readFile(path.join(root, file), "utf8");
-const [html, css, app, core, auth, cloud, config, solana, sql, vercel, pkg, workflow, edge] = await Promise.all([
+const [html, css, app, core, auth, cloud, config, solana, solanaClient, sql, vercel, pkg, workflow, edge] = await Promise.all([
   read("index.html"), read("styles.css"), read("app.js"), read("core.js"), read("auth.js"), read("cloud.js"), read("config.js"), read("solana.js"),
+  read("solana-client.entry.js"),
   read("supabase/schema.sql"), read("vercel.json"), read("package.json"), read(".github/workflows/validate.yml"), read("supabase/functions/delete-account/index.ts")
 ]);
 
@@ -90,7 +91,15 @@ const checks = [
   [core.includes("function boundedNumber"), "invalid numeric data falls back safely"],
   [!core.includes("Reuniones próximas:"), "legacy meetings stay out of active Markdown report"],
   [html.includes('class="mobile-add" data-action="open-capture" aria-label="Capturar"'), "mobile capture has accessible name"],
-  [solana.includes("orbita:v1:introduction"), "privacy-minimal Solana memo adapter"],
+  [solana.includes('MEMO_PROTOCOL_PREFIX = "orbita:v1"'), "canonical Solana protocol prefix"],
+  [solana.includes("event_id: cleanEvent"), "canonical Solana event identifier"],
+  [solana.includes("INTRODUCTION_MEMO_PATTERN"), "runtime Memo privacy assertion"],
+  [core.includes("normalizeSolanaAttestation"), "attestation normalization"],
+  [app.includes('data-action="anchor-solana"'), "Solana anchor action"],
+  [app.includes('data-action="verify-solana"'), "Solana verification action"],
+  [solanaClient.includes('chain: "solana:devnet"'), "Wallet Standard devnet enforcement"],
+  [solanaClient.includes("function waitForConfirmation") && solanaClient.includes("confirmation timeout"), "Solana confirmation polling"],
+  [vercel.includes("https://api.devnet.solana.com"), "exact Solana devnet CSP origin"],
   [auth.includes('/token?grant_type=password'), "password auth"],
   [auth.includes('/recover'), "password recovery"],
   [cloud.includes("class CloudConflictError"), "cloud conflict type"],
@@ -120,7 +129,7 @@ const checks = [
 ];
 for (const [ok, label] of checks) if (!ok) throw new Error(`Check failed: ${label}`);
 
-for (const file of ["app.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "solana.js", "build.mjs", "dev.mjs"]) {
+for (const file of ["app.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "solana.js", "solana-client.entry.js", "build.mjs", "dev.mjs"]) {
   const result = spawnSync(process.execPath, ["--check", path.join(root, file)], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`${file} syntax failed:\n${result.stderr}`);
 }
@@ -146,7 +155,7 @@ if (routes.length !== 4 || allowedRoutes.size !== 4 || ![...allowedRoutes].every
   throw new Error(`Canonical route check failed: expected exactly today, people, network, data; got ${routes.join(", ")}`);
 }
 
-const browserSource = app + auth + cloud + config;
+const browserSource = app + auth + cloud + config + solana + solanaClient;
 if (/sb_secret_|service_role/i.test(browserSource)) {
   throw new Error("Security check failed: browser source mentions a secret/service-role credential.");
 }

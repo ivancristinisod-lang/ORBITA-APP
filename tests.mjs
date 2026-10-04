@@ -3,9 +3,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   normalizeStore, relationshipState, computeSignals, buildMeetingBrief, peopleToCSV,
-  reportToMarkdown, daysBetween, parseContactsCSV, auditStore, repairStore, buildRelationalOpportunities, SCHEMA_VERSION
+  reportToMarkdown, daysBetween, parseContactsCSV, auditStore, repairStore, buildRelationalOpportunities, normalizeSolanaAttestation, SCHEMA_VERSION
 } from "./core.js";
-import { canonicalRelationalClaim, hashRelationalClaim, buildSolanaMemoPayload, solanaExplorerUrl } from "./solana.js";
+import {
+  assertAttestationReceipt, canonicalRelationalClaim, hashRelationalClaim, buildSolanaMemoPayload,
+  executeUserSignedAttestation, solanaExplorerUrl, verifyFetchedAttestation
+} from "./solana.js";
 
 const fixedNow = new Date("2026-08-15T12:00:00-03:00");
 const base = normalizeStore({
@@ -68,15 +71,55 @@ test("relational evidence is traceable to recorded context",()=>{
 });
 
 test("Solana attestation adapter is deterministic and privacy-minimal",async()=>{
-  const claim=canonicalRelationalClaim({actorId:"orbita:alpha",targetId:"orbita:beta"});
+  const claim=canonicalRelationalClaim({actorId:"orbita:alpha",targetId:"orbita:beta",eventId:"interaction:1",name:"Iván",email:"private@example.com",phone:"123",notes:"private",currentGoal:"fundraising"});
   const digestA=await hashRelationalClaim(claim);
   const digestB=await hashRelationalClaim({...claim});
   assert.equal(digestA,digestB);
   assert.match(digestA,/^[a-f0-9]{64}$/);
   const memo=buildSolanaMemoPayload(digestA);
-  assert.match(memo,/^orbita:v1:introduction:introduction:[a-f0-9]{64}$/);
-  assert.doesNotMatch(memo,/ivan|email|phone|goal|note/i);
-  assert.equal(solanaExplorerUrl("demoSignature"),"https://explorer.solana.com/tx/demoSignature?cluster=devnet");
+  assert.match(memo,/^orbita:v1:introduction:[a-f0-9]{64}$/);
+  assert.doesNotMatch(memo,/introduction:introduction|iván|private|email|phone|goal|note/i);
+  assert.deepEqual(Object.keys(claim).sort(),["actor_id","event_id","protocol","target_id","type","version"]);
+});
+
+test("Solana event_id differentiates repeated introductions",async()=>{
+  const first=await hashRelationalClaim(canonicalRelationalClaim({actorId:"actor",targetId:"target",eventId:"i1"}));
+  const same=await hashRelationalClaim(canonicalRelationalClaim({targetId:"target",eventId:"i1",actorId:"actor"}));
+  const second=await hashRelationalClaim(canonicalRelationalClaim({actorId:"actor",targetId:"target",eventId:"i2"}));
+  assert.equal(first,same);
+  assert.notEqual(first,second);
+});
+
+test("Solana Explorer only accepts plausible signatures",()=>{
+  const signature="1".repeat(88);
+  assert.equal(solanaExplorerUrl(signature),`https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  assert.equal(solanaExplorerUrl("demoSignature"),"");
+});
+
+test("attestation normalization preserves valid metadata and strips malformed input",()=>{
+  const digest="a".repeat(64),signature="1".repeat(88),wallet="2".repeat(32);
+  const receipt={cluster:"devnet",signature,digest,wallet,memo:`orbita:v1:introduction:${digest}`,attestedAt:"2026-10-04T12:00:00Z",verificationStatus:"verified"};
+  assert.deepEqual(normalizeSolanaAttestation(receipt),receipt);
+  const normalized=normalizeStore({people:[{id:"p1",name:"Ana"}],interactions:[{id:"i1",personId:"p1",type:"Introducción",solanaAttestation:receipt},{id:"i2",personId:"p1",type:"Nota",solanaAttestation:{...receipt,memo:"PII"}},{id:"i3",personId:"p1",type:"Nota"}]});
+  assert.deepEqual(normalized.interactions[0].solanaAttestation,receipt);
+  assert.equal("solanaAttestation" in normalized.interactions[1],false);
+  assert.equal("solanaAttestation" in normalized.interactions[2],false);
+  assert.deepEqual(normalizeStore(JSON.parse(JSON.stringify(normalized))).interactions[0].solanaAttestation,receipt);
+});
+
+test("wallet rejection and transaction failure stay recoverable",async()=>{
+  const memo=`orbita:v1:introduction:${"b".repeat(64)}`;
+  await assert.rejects(executeUserSignedAttestation({memo,connect:async()=>{throw new Error("wallet rejected");},send:async()=>{}}),/wallet rejected/);
+  await assert.rejects(executeUserSignedAttestation({memo,connect:async()=>"2".repeat(32),send:async()=>{throw new Error("transaction failed");}}),/transaction failed/);
+});
+
+test("confirmed receipt and real evidence verification are explicit",()=>{
+  const digest="c".repeat(64),memo=`orbita:v1:introduction:${digest}`,signature="1".repeat(88),wallet="2".repeat(32);
+  assert.equal(assertAttestationReceipt({digest,memo,signature,wallet,confirmationStatus:"confirmed"}),true);
+  const rpcStatus={confirmationStatus:"confirmed",err:null};
+  const rpcTransaction={meta:{err:null},transaction:{signatures:[signature],message:{accountKeys:[{pubkey:wallet,signer:true}],instructions:[{program:"spl-memo",parsed:memo}]}}};
+  assert.equal(verifyFetchedAttestation({rpcStatus,rpcTransaction,digest,memo,signature,wallet}),true);
+  assert.equal(verifyFetchedAttestation({rpcStatus,rpcTransaction:{...rpcTransaction,meta:{err:{InstructionError:[0,"x"]}}},digest,memo,signature,wallet}),false);
 });
 
 
