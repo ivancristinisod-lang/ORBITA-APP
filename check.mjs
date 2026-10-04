@@ -62,6 +62,12 @@ const checks = [
   [app.includes('action === "network-mode"'), "goal-aware network mode"],
   [app.includes('id="capture-draft"'), "freeform relational capture"],
   [app.includes('id="onboarding-goal-form"'), "goal-first onboarding"],
+  [app.includes("PROBAR CON UNA RED DEMO"), "one-click demo onboarding"],
+  [app.includes("EMPEZAR CON MI RED"), "own-network onboarding path"],
+  [!app.includes('id="onboarding-profile-form"'), "identity setup removed from first-value onboarding"],
+  [app.includes("function tutorialTip") && app.includes("dismiss-tutorial"), "dismissible contextual tutorials"],
+  [app.includes('TUTORIAL_STORAGE_KEY = "orbita.tutorial.v062"'), "tutorial dismissal persistence"],
+  [css.includes(".tutorial-tip") && css.includes(".onboard-choice-grid"), "V0.6.2 first-value styles"],
   [app.includes('networkMode: "goal"'), "network defaults goal-first"],
   [app.includes('data-action="open-goal-network"'), "HOY to goal-network CTA"],
   [app.includes('data-action="network-mode" data-value="all"'), "full network fallback"],
@@ -114,7 +120,7 @@ const checks = [
   [!vercel.includes("https://*.supabase.co"), "no wildcard Supabase CSP"],
   [vercel.includes('"value": "no-referrer"'), "private referrer policy"],
   [vercel.includes("no-store, max-age=0"), "runtime config no-store"],
-  [pkg.includes('"version":"0.6.1"'), "V0.6.1 version"],
+  [pkg.includes('"version":"0.6.2"'), "V0.6.2 version"],
   [pkg.includes('"node":">=22 <25"'), "Node range"],
   [workflow.includes("node-version: 24"), "CI Node 24"]
 ];
