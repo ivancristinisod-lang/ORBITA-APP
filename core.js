@@ -134,7 +134,9 @@ export function lastInteraction(store, personId) {
 export function relationshipState(store, person, now = new Date()) {
   const last = lastInteraction(store, person.id);
   if (!last) return { label: "Sin historial", tone: "neutral", days: null };
-  const elapsed = Math.max(0, daysBetween(last.date, now));
+  const lastDate = toDate(last.date);
+  if (!lastDate) return { label: "Revisar historial", tone: "warn", days: null };
+  const elapsed = Math.max(0, daysBetween(lastDate, now));
   const cadence = Math.max(1, Number(person.cadenceDays || 30));
   if (elapsed <= Math.max(3, Math.round(cadence * 0.5))) return { label: "Al día", tone: "good", days: elapsed };
   if (elapsed <= cadence) return { label: "A tiempo", tone: "neutral", days: elapsed };
@@ -200,7 +202,7 @@ export function computeSignals(store, now = new Date()) {
         priority: rel.tone === "risk" ? 76 : 56,
         tone: rel.tone,
         title: rel.label,
-        body: rel.days == null ? "Todavía no registraste interacciones." : `Pasaron ${rel.days} días desde el último registro. Tu cadencia objetivo es ${person.cadenceDays} días.`,
+        body: rel.days == null ? "Hay un registro con fecha inválida. Revisalo antes de usarlo como señal." : `Pasaron ${rel.days} días desde el último registro. Tu cadencia objetivo es ${person.cadenceDays} días.`,
         personId: person.id,
         entityId: person.id,
         meta: person.circle
