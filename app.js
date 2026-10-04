@@ -11,7 +11,6 @@ import { CloudConflictError, deleteCloudAccount, loadCloudWorkspace, saveCloudWo
 const LEGACY_STORAGE_KEY = "orbita.store.v2";
 const STORAGE_PREFIX = "orbita.store.v3";
 const SYNC_META_PREFIX = "orbita.sync.v1";
-const TUTORIAL_STORAGE_KEY = "orbita.tutorial.v062";
 const ROUTES = {
   today: "Hoy",
   people: "Personas",
@@ -101,38 +100,6 @@ function icon(name, size = 18) {
 
 function hydrateIcons(scope = document) {
   scope.querySelectorAll("[data-icon]").forEach(el => { el.innerHTML = icon(el.dataset.icon); });
-}
-
-function tutorialDismissed(id) {
-  try {
-    const state = JSON.parse(localStorage.getItem(TUTORIAL_STORAGE_KEY) || "{}");
-    return Boolean(state?.[id]);
-  } catch {
-    return false;
-  }
-}
-
-function dismissTutorial(id) {
-  try {
-    const state = JSON.parse(localStorage.getItem(TUTORIAL_STORAGE_KEY) || "{}");
-    state[id] = true;
-    localStorage.setItem(TUTORIAL_STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Tutorial state is non-critical.
-  }
-}
-
-function tutorialTip(id, title, body, actionHtml = "") {
-  if (tutorialDismissed(id)) return "";
-  return `<aside class="tutorial-tip" data-tutorial-id="${esc(id)}">
-    <div class="tutorial-tip-mark">${icon("spark",14)}</div>
-    <div class="tutorial-tip-copy">
-      <strong>${esc(title)}</strong>
-      <p>${esc(body)}</p>
-      ${actionHtml}
-    </div>
-    <button class="tutorial-tip-close" data-action="dismiss-tutorial" data-id="${esc(id)}" aria-label="Cerrar ayuda">${icon("close",13)}</button>
-  </aside>`;
 }
 
 function esc(value = "") {
@@ -440,9 +407,8 @@ function attentionQueue() {
 
 function todayView(){
   const contextualized=store.people.filter(p=>Boolean(p.relation||p.notes||(p.tags||[]).length)).length;
-  if(!store.people.length)return `${pageHead("01","HOY","Inteligencia y acción sobre tu red")}${tutorialTip("empty-start","No necesitás cargar toda tu agenda","ORBITA empieza a ser útil con una sola relación importante. Agregala manualmente o importá contactos si ya tenés un CSV.")}<section class="onboarding-card v06-empty v062-empty"><div class="onboarding-mark">${icon("network",30)}</div><span class="eyebrow">EMPEZÁ POR UNA PERSONA IMPORTANTE</span><h2>Dale a ORBITA contexto real para poder ayudarte.</h2><p>Una relación con historia vale más que cien contactos vacíos.</p><div class="empty-actions"><button class="btn btn-acid" data-action="capture-kind" data-kind="person">${icon("plus")} AGREGAR UNA PERSONA</button><button class="btn btn-ghost" data-action="import-csv">${icon("upload")} IMPORTAR CSV</button></div></section>`;
+  if(!store.people.length)return `${pageHead("01","HOY","Inteligencia y acción sobre tu red")}<section class="onboarding-card v06-empty v062-empty"><div class="onboarding-mark">${icon("network",30)}</div><span class="eyebrow">EMPEZÁ POR UNA PERSONA IMPORTANTE</span><h2>Dale a ORBITA contexto real para poder ayudarte.</h2><p>Una relación con historia vale más que cien contactos vacíos.</p><div class="empty-actions"><button class="btn btn-acid" data-action="capture-kind" data-kind="person">${icon("plus")} AGREGAR UNA PERSONA</button><button class="btn btn-ghost" data-action="import-csv">${icon("upload")} IMPORTAR CSV</button></div></section>`;
   return `${pageHead("01","HOY","Tu sistema operativo relacional",`<span class="date-chip">${esc(new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date()).toUpperCase())}</span>`)}
-    ${tutorialTip("today-goal","Empezá por tu objetivo","Cuanto más concreto sea, mejor puede ORBITA encontrar evidencia real en tu red.",`<button class="tutorial-inline-action" data-action="focus-goal">EDITAR OBJETIVO →</button>`)}
     ${relationalGoalPanel()}
     <section class="attention-section">
       <div class="section-head v06-section-head"><div><span class="eyebrow">NECESITA TU ATENCIÓN</span><h2>Qué merece movimiento ahora</h2></div><button class="text-btn" data-action="open-capture">CAPTURAR +</button></div>
@@ -461,7 +427,6 @@ function peopleView(){
   const q=ui.peopleQuery.trim().toLowerCase();
   const people=store.people.filter(p=>ui.circleFilter==="Todos"||p.circle===ui.circleFilter).filter(p=>!q||[p.name,p.role,p.company,p.city,p.tags.join(" "),p.relation].join(" ").toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,"es"));
   return `${pageHead("02","PERSONAS","Relaciones con historia, no registros de CRM")}
-    ${tutorialTip("people-context","Una relación mejora con contexto","No hace falta cargar toda tu agenda. Empezá por las personas importantes y registrá qué pasó, qué saben y qué quedó pendiente.")}
     <div class="people-toolbar v06-people-toolbar">
       <label class="inline-search">${icon("search",17)}<input id="people-search" value="${esc(ui.peopleQuery)}" placeholder="Buscar personas, empresas o contexto…" /></label>
       <button class="btn btn-primary" data-action="capture-kind" data-kind="person">${icon("plus")} NUEVA RELACIÓN</button>
@@ -517,7 +482,6 @@ function networkView(){
   const visibleSignals=computeSignals(store).filter(signal=>signal.type!=="meeting").length;
 
   return `${pageHead("03","RED",goalMode?"Red para tu objetivo":"Vista completa de tus relaciones")}
-    ${tutorialTip("network-read","Leé relevancia, no valor humano","Los nodos destacados son relevantes para tu objetivo actual porque existe evidencia registrada. Abrilos para entender por qué.")}
     <section class="network-command goal-first-command">
       <div class="network-goal-context">
         <span>${goalMode?"RED PARA TU OBJETIVO":"RED COMPLETA"}</span>
@@ -570,7 +534,7 @@ function dataAdvanced(){
 function dataView(){
   const tab=["info","system","account","advanced"].includes(ui.dataTab)?ui.dataTab:"info";
   const content=tab==="info"?dataInfo():tab==="system"?dataSystem():tab==="account"?dataAccount():dataAdvanced();
-  return `${pageHead("04","DATOS","Control, portabilidad y herramientas avanzadas")}${tutorialTip("data-control","Tus datos siguen bajo tu control","Desde acá podés hacer backups, importar contactos y revisar la salud del workspace. No necesitás entrar seguido.")}<div class="data-layout v06-data-layout"><aside class="data-nav v06-data-nav">${[["info","archive","Mi información"],["system","shield","Sistema"],["account","person","Cuenta"],["advanced","database","Avanzado"]].map(([id,ic,label])=>`<button class="${tab===id?"active":""}" data-action="data-tab" data-value="${id}">${icon(ic,14)} ${label}</button>`).join("")}</aside><section class="data-content">${content}</section></div>`;
+  return `${pageHead("04","DATOS","Control, portabilidad y herramientas avanzadas")}<div class="data-layout v06-data-layout"><aside class="data-nav v06-data-nav">${[["info","archive","Mi información"],["system","shield","Sistema"],["account","person","Cuenta"],["advanced","database","Avanzado"]].map(([id,ic,label])=>`<button class="${tab===id?"active":""}" data-action="data-tab" data-value="${id}">${icon(ic,14)} ${label}</button>`).join("")}</aside><section class="data-content">${content}</section></div>`;
 }
 
 function relationshipTimeline(person){
@@ -932,6 +896,7 @@ function showOnboarding(step=ui.onboardingStep) {
   ui.onboardingStep=Math.max(0,Math.min(1,step));
   onboardingShell.classList.add("open");
   onboardingShell.setAttribute("aria-hidden","false");
+  document.body.classList.add("no-scroll");
   const hasCurrent=store.people.length>0;
   const progress=[0,1].map(i=>`<i class="${i<=ui.onboardingStep?"active":""}"></i>`).join("");
   let body="";
@@ -939,9 +904,9 @@ function showOnboarding(step=ui.onboardingStep) {
   if(ui.onboardingStep===0){
     body=`<div class="onboard-hero v062-onboard-hero">
       <div class="onboard-hero-copy">
-        <span class="eyebrow">TU RED, LEÍDA SEGÚN LO QUE QUERÉS LOGRAR</span>
-        <h1>Decime qué querés lograr. ORBITA te muestra quién de tu red puede ayudarte, por qué y qué hacer después.</h1>
-        <p>Tu red no necesita otra agenda. Necesita contexto, memoria y una forma clara de encontrar oportunidades reales.</p>
+        <span class="eyebrow">TU RED, LEÍDA SEGÚN TU OBJETIVO</span>
+        <h1>Decime qué querés lograr. ORBITA encuentra quién puede ayudarte.</h1>
+        <p>Te muestra por qué esa relación importa ahora y cuál podría ser tu próximo movimiento.</p>
         <div class="onboard-loop v062-onboard-loop"><span>OBJETIVO</span><i>→</i><span>RED</span><i>→</i><span>EVIDENCIA</span><i>→</i><span>ACCIÓN</span></div>
       </div>
       <div class="onboard-choice-grid">
@@ -964,7 +929,7 @@ function showOnboarding(step=ui.onboardingStep) {
     body=`<form id="onboarding-goal-form" class="onboard-form v062-goal-onboarding">
       <span class="eyebrow">01 · TU OBJETIVO</span>
       <h2>¿Qué querés lograr ahora?</h2>
-      <p>Ese objetivo es la lente con la que ORBITA va a leer tu red. Podés cambiarlo cuando quieras.</p>
+      <p>ORBITA usa este objetivo para encontrar relaciones relevantes. Podés cambiarlo cuando quieras.</p>
       <label class="onboard-goal-field"><textarea name="goal" rows="3" maxlength="280" required autofocus placeholder="Ej: Estoy buscando clientes para mi consultora de IA">${esc(store.profile.currentGoal||"")}</textarea></label>
       <div class="goal-examples">
         <button type="button" data-action="goal-example" data-value="Conseguir clientes">Conseguir clientes</button>
@@ -994,6 +959,7 @@ function showOnboarding(step=ui.onboardingStep) {
 function hideOnboarding() {
   onboardingShell.classList.remove("open");
   onboardingShell.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("no-scroll");
 }
 
 function finishOnboarding(mode = "keep") {
@@ -1144,7 +1110,6 @@ async function handleAction(target) {
   else if (action === "onboarding-next") showOnboarding(ui.onboardingStep + 1);
   else if (action === "onboarding-back") showOnboarding(ui.onboardingStep - 1);
   else if (action === "onboarding-finish") finishOnboarding(el.dataset.value || "keep");
-  else if (action === "dismiss-tutorial") { dismissTutorial(id); el.closest(".tutorial-tip")?.remove(); }
   else if (action === "open-help") openHelp(currentRoute());
   else if (action === "start-onboarding") { closeDrawer(); showOnboarding(0); }
   else if (action === "sync-now") await syncNow();

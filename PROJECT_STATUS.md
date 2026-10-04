@@ -1,11 +1,21 @@
 # ORBITA — Project Status
 
 **Product generation:** V0.6  
-**Patch:** 0.6.2 — First Value Experience  
+**Patch:** 0.6.3 — Visual Finish  
 **Stage:** Functional Alpha / Pre-MVP → Experience validation  
 **Frontend:** Vercel  
 **Backend-ready:** Supabase ORBITA (`sa-east-1`), desacoplado hasta activación  
 **Primary user:** founders / entrepreneurs
+
+## V0.6.3 — visual finish
+
+- [x] tutoriales contextuales removidos
+- [x] onboarding one-screen en desktop/notebook
+- [x] doble scroll del onboarding eliminado
+- [x] copy de entrada reducido y más escaneable
+- [x] escala tipográfica de HOY y onboarding compactada
+- [x] demo inmediata + objetivo primero preservados
+- [x] core relacional / datos / auth / cloud sin cambios funcionales
 
 ## V0.6.2 — first value
 
@@ -13,8 +23,6 @@
 - [x] demo inmediata en un click
 - [x] objetivo antes que identidad/perfil
 - [x] perfil diferido a DATOS
-- [x] tutoriales contextuales cerrables
-- [x] dismissals de tutorial persistidos fuera del schema del workspace
 - [x] empty states accionables
 - [x] más espacio entre superficies y márgenes laterales
 - [x] mobile mantiene composición compacta

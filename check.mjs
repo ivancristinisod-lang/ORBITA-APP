@@ -65,9 +65,9 @@ const checks = [
   [app.includes("PROBAR CON UNA RED DEMO"), "one-click demo onboarding"],
   [app.includes("EMPEZAR CON MI RED"), "own-network onboarding path"],
   [!app.includes('id="onboarding-profile-form"'), "identity setup removed from first-value onboarding"],
-  [app.includes("function tutorialTip") && app.includes("dismiss-tutorial"), "dismissible contextual tutorials"],
-  [app.includes('TUTORIAL_STORAGE_KEY = "orbita.tutorial.v062"'), "tutorial dismissal persistence"],
-  [css.includes(".tutorial-tip") && css.includes(".onboard-choice-grid"), "V0.6.2 first-value styles"],
+      [!app.includes("tutorialTip") && !css.includes(".tutorial-tip"), "contextual tutorial banners removed"],
+  [css.includes(".onboard-choice-grid") && css.includes("V0.6.3 — VISUAL FINISH"), "V0.6.3 compact visual styles"],
+  [app.includes('document.body.classList.add("no-scroll")') && app.includes('document.body.classList.remove("no-scroll")'), "onboarding prevents double document scroll"],
   [app.includes('networkMode: "goal"'), "network defaults goal-first"],
   [app.includes('data-action="open-goal-network"'), "HOY to goal-network CTA"],
   [app.includes('data-action="network-mode" data-value="all"'), "full network fallback"],
@@ -120,7 +120,7 @@ const checks = [
   [!vercel.includes("https://*.supabase.co"), "no wildcard Supabase CSP"],
   [vercel.includes('"value": "no-referrer"'), "private referrer policy"],
   [vercel.includes("no-store, max-age=0"), "runtime config no-store"],
-  [pkg.includes('"version":"0.6.2"'), "V0.6.2 version"],
+  [pkg.includes('"version":"0.6.3"'), "V0.6.3 version"],
   [pkg.includes('"node":">=22 <25"'), "Node range"],
   [workflow.includes("node-version: 24"), "CI Node 24"]
 ];
