@@ -48,6 +48,23 @@ function recordList(value) {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
+export function normalizeSolanaAttestation(value) {
+  if (!isRecord(value) || value.cluster !== "devnet") return null;
+  const signature = asText(value.signature).trim();
+  const digest = asText(value.digest).trim().toLowerCase();
+  const wallet = asText(value.wallet).trim();
+  const memo = asText(value.memo).trim();
+  const attestedAt = asText(value.attestedAt).trim();
+  const verificationStatus = value.verificationStatus === "verified" ? "verified" : "unverified";
+  const base58 = /^[1-9A-HJ-NP-Za-km-z]+$/;
+  if (![87, 88].includes(signature.length) || !base58.test(signature)) return null;
+  if (wallet.length < 32 || wallet.length > 44 || !base58.test(wallet)) return null;
+  if (!/^[a-f0-9]{64}$/.test(digest)) return null;
+  if (memo !== `orbita:v1:introduction:${digest}`) return null;
+  if (!toDate(attestedAt)) return null;
+  return { cluster: "devnet", signature, digest, wallet, memo, attestedAt, verificationStatus };
+}
+
 export function normalizeStore(input) {
   const source = isRecord(input) ? input : {};
   const profile = isRecord(source.profile) ? source.profile : {};
@@ -79,15 +96,19 @@ export function normalizeStore(input) {
       tags: Array.isArray(p.tags) ? p.tags.map(tag => asText(tag).trim()).filter(Boolean) : [],
       createdAt: asText(p.createdAt) || new Date().toISOString()
     })),
-    interactions: recordList(source.interactions).map(i => ({
-      id: asText(i.id).trim() || makeId("i"),
-      personId: asText(i.personId).trim(),
-      date: asText(i.date) || new Date().toISOString(),
-      type: asText(i.type, "Nota") || "Nota",
-      title: asText(i.title, "Interacción") || "Interacción",
-      notes: asText(i.notes),
-      source: "manual"
-    })),
+    interactions: recordList(source.interactions).map(i => {
+      const solanaAttestation = normalizeSolanaAttestation(i.solanaAttestation);
+      return {
+        id: asText(i.id).trim() || makeId("i"),
+        personId: asText(i.personId).trim(),
+        date: asText(i.date) || new Date().toISOString(),
+        type: asText(i.type, "Nota") || "Nota",
+        title: asText(i.title, "Interacción") || "Interacción",
+        notes: asText(i.notes),
+        source: "manual",
+        ...(solanaAttestation ? { solanaAttestation } : {})
+      };
+    }),
     commitments: recordList(source.commitments).map(c => ({
       id: asText(c.id).trim() || makeId("c"),
       personId: asText(c.personId).trim(),
