@@ -1,18 +1,24 @@
-# ORBITA — Design System 0.6
+# ORBITA — Design System 0.6.1
 
 ## Product expression
 
-ORBITA debe sentirse **premium, editorial, tecnológico y distintivo**, sin caer en template SaaS, estética de IA genérica ni ciencia ficción decorativa.
+ORBITA debe sentirse premium, editorial, tecnológico y humano. La interfaz prioriza comprensión y confianza sobre densidad visual.
 
-La interfaz prioriza comprensión y confianza sobre densidad visual.
+## Product hierarchy
 
-## Semantic hierarchy
+**OBJETIVO → RED → EVIDENCIA → OPORTUNIDAD → ACCIÓN**
 
-**SIGNAL → CONTEXT → DETAIL → ACTION**
+En HOY:
 
-En HOY la jerarquía concreta es:
+**OBJETIVO → OPORTUNIDADES → NECESITA TU ATENCIÓN → MEMORIA RELACIONAL**
 
-**OBJETIVO → OPORTUNIDAD → EVIDENCIA → ATENCIÓN → CONTEXTO SECUNDARIO**
+## Navigation
+
+Solo cuatro superficies principales:
+
+**HOY / PERSONAS / RED / DATOS**
+
+Agenda no forma parte del MVP V0.6.1.
 
 ## Palette
 
@@ -21,85 +27,39 @@ En HOY la jerarquía concreta es:
 - Surface 2: `#121411`
 - Surface 3: `#181A16`
 - Border: `#292C25`
-- Acid: `#DCFF00` — acción, selección y foco prioritario.
-- Cobalt: `#2747FF` — inteligencia del sistema e inferencia.
-- Ivory: `#E9DFCB` — contexto humano, lectura principal y evidencia factual.
-- Alert: `#FF5738` — riesgo real o acción destructiva.
-- Healthy: `#62B36D` — estado saludable.
+- Acid: `#DCFF00` — acción / selección
+- Cobalt: `#2747FF` — inteligencia / inferencia
+- Ivory: `#E9DFCB` — evidencia / lectura humana
+- Alert: `#FF5738` — riesgo real
+- Healthy: `#62B36D` — estado saludable
 
-El color nunca debe ser el único portador de significado.
+## Evidence semantics
 
-## Typography
-
-- Headline: condensed display fuerte.
-- Body: sans-serif altamente legible.
-- Objetivo actual: 38–64px según viewport.
-- Nombre de persona: 24–38px en detalle.
-- Body relevante: 12–16px.
-- Metadata significativa: mínimo práctico 9–11px.
-
-La escala debe expresar prioridad, no decoración.
-
-## Spacing
-
-- Macro: 48–72px.
-- Component: 20–28px.
-- Micro: 6–12px.
-
-Dense no significa cramped.
-
-## Components
-
-Preferir composición y whitespace sobre cards anidadas. Máximo una CTA dominante por bloque visual.
-
-### Evidence semantics
-
-- **HECHO:** neutral / ivory.
+- **HECHO:** ivory / neutral.
 - **INFERENCIA:** cobalt.
 - **ACCIÓN:** acid.
 - **RIESGO:** alert.
 
-Una inferencia nunca se presenta como evidencia.
+Una inferencia nunca se presenta como hecho.
 
-## Network
+## RED
 
-La órbita representa estructura y relevancia contextual. No dibuja conexiones inexistentes y no usa tamaño/prominencia como valoración humana.
+RED es goal-first. Con objetivo, el objetivo actual domina, las relaciones relevantes se destacan y las irrelevantes se atenúan. No se inventan edges.
+
+La **RED COMPLETA** se conserva como vista secundaria. Sin objetivo se muestra un empty state con **DEFINIR OBJETIVO** y fallback **VER RED COMPLETA**.
+
+## PERSONAS
+
+La fila completa debe ser semánticamente interactiva y accesible. Evitar pseudo-buttons y nested interactive controls inválidos.
+
+El detalle mantiene: **AHORA → CONTEXTO → COMPROMISOS → OPORTUNIDADES → HISTORIA**. Meetings legacy no se muestran.
 
 ## Motion
 
-Motion premium y restringido:
-- drawers;
-- modals;
-- emphasis;
-- ranked opportunity appearance;
-- save/feedback.
-
-Sin partículas, glow permanente, loading cinematográfico ni WebGL por estética. Respetar `prefers-reduced-motion`.
-
-## Mobile
-
-Mobile es una composición propia:
-- navegación compacta;
-- HOY ordenado por acción;
-- PERSONA con historia longitudinal;
-- RED como superficie focal;
-- AGENDA list-first;
-- DATOS simplificado.
-
-## Anti-patterns
-
-- cards por todas partes;
-- border-radius excesivo;
-- glow/neón sin intención;
-- texto microscópico;
-- métricas sin acción;
-- dashboards donde todo tiene igual jerarquía;
-- estética “AI generated”;
-- animación decorativa;
-- CRM visual disfrazado de producto relacional.
+Motion explica orientación o cambio de estado. Sin partículas, glow permanente ni WebGL ornamental. Respetar `prefers-reduced-motion`.
 
 ## Principle
 
-**Las personas no son leads y la relación no es un score.**
+**Las personas no son leads y una relación no es un score.**
 
-La UI puede mostrar relevancia contextual para una tarea, pero nunca convertirla en una medida de valor humano.
+La relevancia contextual existe para una tarea concreta; no mide el valor de una persona.
