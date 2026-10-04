@@ -335,40 +335,48 @@ function personCorpus(store, person) {
 
 function evidenceForOpportunity(store, person, intent, now = new Date()) {
   const facts = [];
-  const corpus = personCorpus(store, person);
-  const directHits = intent.direct.filter(term => corpus.includes(normalizedText(term)));
-  const connectorHits = intent.connector.filter(term => corpus.includes(normalizedText(term)));
-  const recent = interactionsFor(store, person.id)[0] || null;
+  const terms = [...intent.direct, ...intent.connector];
+  const containsIntent = value => {
+    const text = normalizedText(value);
+    return terms.some(term => text.includes(normalizedText(term)));
+  };
+  const profileText = [person.role, person.company, ...(person.tags || [])].filter(Boolean).join(" · ");
+  const interactions = interactionsFor(store, person.id);
   const openOpps = opportunitiesFor(store, person.id);
   const openCommitments = openCommitmentsFor(store, person.id);
 
-  if (directHits.length) {
-    facts.push({
-      source: "perfil",
-      text: `${person.name} tiene señales directas vinculadas a ${intent.label}: ${[person.role, person.company, ...(person.tags || [])].filter(Boolean).join(" · ")}.`
-    });
+  if (profileText && containsIntent(profileText)) {
+    facts.push({ source: "perfil", text: profileText });
   }
-  if (connectorHits.length && !directHits.length) {
-    facts.push({
-      source: "contexto",
-      text: person.relation || `${person.name} aparece como una relación con capacidad de conexión dentro de tu red.`
-    });
-  } else if (person.relation && /(intro|present|conect|red|network|fondo|invers|cliente|partner)/i.test(normalizedText(person.relation))) {
+  if (person.relation && containsIntent(person.relation)) {
     facts.push({ source: "contexto", text: person.relation });
   }
-  if (recent) {
+
+  const relevantInteraction = interactions.find(interaction =>
+    containsIntent([interaction.type, interaction.title, interaction.notes].filter(Boolean).join(" "))
+  );
+  if (relevantInteraction) {
     facts.push({
       source: "interacción",
-      text: `Último registro: ${recent.title}${recent.notes ? ` — ${recent.notes}` : ""} (${formatRelative(recent.date, now)}).`
+      text: `${relevantInteraction.title}${relevantInteraction.notes ? ` — ${relevantInteraction.notes}` : ""} (${formatRelative(relevantInteraction.date, now)}).`
     });
   }
-  if (openOpps.length) {
-    const opp = openOpps[0];
-    facts.push({ source: "oportunidad", text: `${opp.title}${opp.notes ? ` — ${opp.notes}` : ""}.` });
+
+  const relevantOpportunity = openOpps.find(opportunity =>
+    containsIntent([opportunity.title, opportunity.stage, opportunity.notes].filter(Boolean).join(" "))
+  );
+  if (relevantOpportunity) {
+    facts.push({
+      source: "oportunidad",
+      text: `${relevantOpportunity.title}${relevantOpportunity.notes ? ` — ${relevantOpportunity.notes}` : ""}.`
+    });
   }
-  if (openCommitments.length) {
-    facts.push({ source: "compromiso", text: `Hay un compromiso abierto: ${openCommitments[0].title}.` });
+
+  const relevantCommitment = openCommitments.find(commitment => containsIntent(commitment.title));
+  if (relevantCommitment) {
+    facts.push({ source: "compromiso", text: `Hay un compromiso abierto: ${relevantCommitment.title}.` });
   }
+
   return facts.slice(0, 4);
 }
 
