@@ -131,3 +131,19 @@ test("relational evidence attributes the actual supporting source",()=>{
   assert.ok(result.evidence.some(item=>item.source==="interacción"&&/investor/i.test(item.text)));
   assert.equal(result.evidence.some(item=>item.source==="perfil"&&/señales directas vinculadas/i.test(item.text)),false);
 });
+
+
+test("invalid interaction dates fail safely without NaN relationship signals",()=>{
+  const broken=normalizeStore({
+    people:[{id:"p1",name:"Ana",cadenceDays:30}],
+    interactions:[{id:"i1",personId:"p1",date:"not-a-date",title:"Registro"}]
+  });
+  const rel=relationshipState(broken,broken.people[0],fixedNow);
+  assert.equal(rel.label,"Revisar historial");
+  assert.equal(rel.tone,"warn");
+  assert.equal(rel.days,null);
+  const signal=computeSignals(broken,fixedNow).find(item=>item.type==="relationship");
+  assert.ok(signal);
+  assert.doesNotMatch(signal.body,/NaN/);
+  assert.match(signal.body,/fecha inválida/i);
+});
