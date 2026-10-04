@@ -38,7 +38,6 @@ const checks = [
   [app.includes("function todayView"), "today route"],
   [app.includes("function peopleView"), "people route"],
   [app.includes("function networkView"), "network route"],
-  [app.includes("function agendaView"), "agenda route"],
   [app.includes("function dataView"), "data route"],
   [app.includes("function showAuth"), "auth UI"],
   [app.includes("function showOnboarding"), "onboarding UI"],
@@ -52,7 +51,6 @@ const checks = [
   [app.includes("Never let normalizeStore()"), "fresh-browser overwrite regression guard"],
   [app.includes("scheduleCloudSync"), "cloud sync"],
   [app.includes("submitEntityForm"), "CRUD"],
-  [app.includes("openMeetingBrief"), "meeting brief"],
   [core.includes("computeSignals"), "signal engine"],
   [core.includes("parseContactsCSV"), "CSV parser"],
   [core.includes("auditStore"), "data audit"],
@@ -64,6 +62,16 @@ const checks = [
   [app.includes('action === "network-mode"'), "goal-aware network mode"],
   [app.includes('id="capture-draft"'), "freeform relational capture"],
   [app.includes('id="onboarding-goal-form"'), "goal-first onboarding"],
+  [app.includes('networkMode: "goal"'), "goal-first network default"],
+  [app.includes('action === "open-goal-network"'), "HOY goal-network navigation"],
+  [app.includes('data-action="network-mode" data-value="all"'), "secondary full-network fallback"],
+  [app.includes('data-action="define-goal"'), "network empty-state goal CTA"],
+  [!html.includes('data-route="agenda"') && !app.includes('agenda: "Agenda"'), "Agenda removed from primary product routes"],
+  [!app.includes("function agendaView") && !app.includes("openMeetingBrief"), "Agenda and Meeting Brief UI removed"],
+  [!app.includes('data-kind="meeting"') && !app.includes('kind === "meeting"'), "meeting creation UI removed"],
+  [!app.includes("LOCAL · EXPLICABLE"), "implementation-local badge removed"],
+  [!app.includes("PREPARAR ACCIÓN"), "relational CTA semantics aligned"],
+  [app.includes('aria-label="Abrir relación con'), "people rows have semantic accessible labels"],
   [solana.includes("orbita:v1:introduction"), "privacy-minimal Solana memo adapter"],
   [auth.includes('/token?grant_type=password'), "password auth"],
   [auth.includes('/recover'), "password recovery"],
@@ -88,7 +96,7 @@ const checks = [
   [!vercel.includes("https://*.supabase.co"), "no wildcard Supabase CSP"],
   [vercel.includes('"value": "no-referrer"'), "private referrer policy"],
   [vercel.includes("no-store, max-age=0"), "runtime config no-store"],
-  [pkg.includes('"version":"0.6.0"'), "V0.6 version"],
+  [pkg.includes('"version":"0.6.1"'), "V0.6.1 version"],
   [pkg.includes('"node":">=22 <25"'), "Node range"],
   [workflow.includes("node-version: 24"), "CI Node 24"]
 ];
@@ -105,9 +113,12 @@ const missingActions = declaredActions.filter(action => !handledActions.has(acti
 if (missingActions.length) throw new Error(`Unimplemented UI actions: ${missingActions.join(", ")}`);
 
 const routes = [...new Set((html + app).match(/data-route=\\?"([a-z0-9-]+)/g)?.map(x => x.match(/data-route=\\?"([a-z0-9-]+)/)[1]) || [])];
-const allowedRoutes = new Set(["today", "people", "network", "agenda", "data"]);
+const allowedRoutes = new Set(["today", "people", "network", "data"]);
 const invalidRoutes = routes.filter(route => !allowedRoutes.has(route));
 if (invalidRoutes.length) throw new Error(`Invalid routes: ${invalidRoutes.join(", ")}`);
+if (routes.length !== 4 || allowedRoutes.size !== 4 || ![...allowedRoutes].every(route => routes.includes(route))) {
+  throw new Error(`Canonical route check failed: expected exactly today, people, network, data; got ${routes.join(", ")}`);
+}
 
 const browserSource = app + auth + cloud + config;
 if (/sb_secret_|service_role/i.test(browserSource)) {
