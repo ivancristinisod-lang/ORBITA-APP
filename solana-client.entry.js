@@ -36,6 +36,18 @@ export async function listWallets() {
   return client.wallet.getState().wallets.map(wallet => ({ name: wallet.name, icon: wallet.icon || "" }));
 }
 
+async function waitForConfirmation(signature, { timeoutMs = 30_000, pollMs = 800 } = {}) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const response = await client.rpc.getSignatureStatuses([signature], { searchTransactionHistory: true }).send();
+    const status = response.value?.[0] || null;
+    if (status?.err) throw new Error("transaction failure");
+    if (status && ["confirmed", "finalized"].includes(status.confirmationStatus)) return status;
+    await new Promise(resolve => setTimeout(resolve, pollMs));
+  }
+  throw new Error("confirmation timeout");
+}
+
 export async function attestMemo({ memo = "", buildMemo, walletName, onState = () => {} }) {
   try {
     await client.wallet.whenReady();
@@ -67,11 +79,7 @@ export async function attestMemo({ memo = "", buildMemo, walletName, onState = (
     if (!signature) throw new Error("send failure: missing signature");
     onState("confirming");
 
-    const statusResponse = await client.rpc.getSignatureStatuses([signature], { searchTransactionHistory: true }).send();
-    const status = statusResponse.value?.[0];
-    if (!status || status.err || !["confirmed", "finalized"].includes(status.confirmationStatus)) {
-      throw new Error("confirmation timeout or transaction failure");
-    }
+    const status = await waitForConfirmation(signature);
     return { signature, wallet, memo, confirmationStatus: status.confirmationStatus };
   } catch (error) {
     const mapped = new Error(errorMessage(error));
