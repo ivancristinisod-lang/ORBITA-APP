@@ -11,6 +11,7 @@ import { CloudConflictError, deleteCloudAccount, loadCloudWorkspace, saveCloudWo
 const LEGACY_STORAGE_KEY = "orbita.store.v2";
 const STORAGE_PREFIX = "orbita.store.v3";
 const SYNC_META_PREFIX = "orbita.sync.v1";
+const TUTORIAL_STORAGE_KEY = "orbita.tutorial.v062";
 const ROUTES = {
   today: "Hoy",
   people: "Personas",
@@ -100,6 +101,38 @@ function icon(name, size = 18) {
 
 function hydrateIcons(scope = document) {
   scope.querySelectorAll("[data-icon]").forEach(el => { el.innerHTML = icon(el.dataset.icon); });
+}
+
+function tutorialDismissed(id) {
+  try {
+    const state = JSON.parse(localStorage.getItem(TUTORIAL_STORAGE_KEY) || "{}");
+    return Boolean(state?.[id]);
+  } catch {
+    return false;
+  }
+}
+
+function dismissTutorial(id) {
+  try {
+    const state = JSON.parse(localStorage.getItem(TUTORIAL_STORAGE_KEY) || "{}");
+    state[id] = true;
+    localStorage.setItem(TUTORIAL_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Tutorial state is non-critical.
+  }
+}
+
+function tutorialTip(id, title, body, actionHtml = "") {
+  if (tutorialDismissed(id)) return "";
+  return `<aside class="tutorial-tip" data-tutorial-id="${esc(id)}">
+    <div class="tutorial-tip-mark">${icon("spark",14)}</div>
+    <div class="tutorial-tip-copy">
+      <strong>${esc(title)}</strong>
+      <p>${esc(body)}</p>
+      ${actionHtml}
+    </div>
+    <button class="tutorial-tip-close" data-action="dismiss-tutorial" data-id="${esc(id)}" aria-label="Cerrar ayuda">${icon("close",13)}</button>
+  </aside>`;
 }
 
 function esc(value = "") {
@@ -407,8 +440,9 @@ function attentionQueue() {
 
 function todayView(){
   const contextualized=store.people.filter(p=>Boolean(p.relation||p.notes||(p.tags||[]).length)).length;
-  if(!store.people.length)return `${pageHead("01","HOY","Inteligencia y acción sobre tu red")}<section class="onboarding-card v06-empty"><div class="onboarding-mark">${icon("network",30)}</div><span class="eyebrow">TU ÓRBITA ESTÁ VACÍA</span><h2>Agregá una relación para empezar a construir contexto.</h2><p>ORBITA necesita hechos registrados para poder detectar señales y oportunidades reales.</p><button class="btn btn-acid" data-action="capture-kind" data-kind="person">${icon("plus")} AGREGAR PRIMERA RELACIÓN</button></section>`;
+  if(!store.people.length)return `${pageHead("01","HOY","Inteligencia y acción sobre tu red")}${tutorialTip("empty-start","No necesitás cargar toda tu agenda","ORBITA empieza a ser útil con una sola relación importante. Agregala manualmente o importá contactos si ya tenés un CSV.")}<section class="onboarding-card v06-empty v062-empty"><div class="onboarding-mark">${icon("network",30)}</div><span class="eyebrow">EMPEZÁ POR UNA PERSONA IMPORTANTE</span><h2>Dale a ORBITA contexto real para poder ayudarte.</h2><p>Una relación con historia vale más que cien contactos vacíos.</p><div class="empty-actions"><button class="btn btn-acid" data-action="capture-kind" data-kind="person">${icon("plus")} AGREGAR UNA PERSONA</button><button class="btn btn-ghost" data-action="import-csv">${icon("upload")} IMPORTAR CSV</button></div></section>`;
   return `${pageHead("01","HOY","Tu sistema operativo relacional",`<span class="date-chip">${esc(new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date()).toUpperCase())}</span>`)}
+    ${tutorialTip("today-goal","Empezá por tu objetivo","Cuanto más concreto sea, mejor puede ORBITA encontrar evidencia real en tu red.",`<button class="tutorial-inline-action" data-action="focus-goal">EDITAR OBJETIVO →</button>`)}
     ${relationalGoalPanel()}
     <section class="attention-section">
       <div class="section-head v06-section-head"><div><span class="eyebrow">NECESITA TU ATENCIÓN</span><h2>Qué merece movimiento ahora</h2></div><button class="text-btn" data-action="open-capture">CAPTURAR +</button></div>
@@ -427,6 +461,7 @@ function peopleView(){
   const q=ui.peopleQuery.trim().toLowerCase();
   const people=store.people.filter(p=>ui.circleFilter==="Todos"||p.circle===ui.circleFilter).filter(p=>!q||[p.name,p.role,p.company,p.city,p.tags.join(" "),p.relation].join(" ").toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,"es"));
   return `${pageHead("02","PERSONAS","Relaciones con historia, no registros de CRM")}
+    ${tutorialTip("people-context","Una relación mejora con contexto","No hace falta cargar toda tu agenda. Empezá por las personas importantes y registrá qué pasó, qué saben y qué quedó pendiente.")}
     <div class="people-toolbar v06-people-toolbar">
       <label class="inline-search">${icon("search",17)}<input id="people-search" value="${esc(ui.peopleQuery)}" placeholder="Buscar personas, empresas o contexto…" /></label>
       <button class="btn btn-primary" data-action="capture-kind" data-kind="person">${icon("plus")} NUEVA RELACIÓN</button>
@@ -482,6 +517,7 @@ function networkView(){
   const visibleSignals=computeSignals(store).filter(signal=>signal.type!=="meeting").length;
 
   return `${pageHead("03","RED",goalMode?"Red para tu objetivo":"Vista completa de tus relaciones")}
+    ${tutorialTip("network-read","Leé relevancia, no valor humano","Los nodos destacados son relevantes para tu objetivo actual porque existe evidencia registrada. Abrilos para entender por qué.")}
     <section class="network-command goal-first-command">
       <div class="network-goal-context">
         <span>${goalMode?"RED PARA TU OBJETIVO":"RED COMPLETA"}</span>
@@ -534,7 +570,7 @@ function dataAdvanced(){
 function dataView(){
   const tab=["info","system","account","advanced"].includes(ui.dataTab)?ui.dataTab:"info";
   const content=tab==="info"?dataInfo():tab==="system"?dataSystem():tab==="account"?dataAccount():dataAdvanced();
-  return `${pageHead("04","DATOS","Control, portabilidad y herramientas avanzadas")}<div class="data-layout v06-data-layout"><aside class="data-nav v06-data-nav">${[["info","archive","Mi información"],["system","shield","Sistema"],["account","person","Cuenta"],["advanced","database","Avanzado"]].map(([id,ic,label])=>`<button class="${tab===id?"active":""}" data-action="data-tab" data-value="${id}">${icon(ic,14)} ${label}</button>`).join("")}</aside><section class="data-content">${content}</section></div>`;
+  return `${pageHead("04","DATOS","Control, portabilidad y herramientas avanzadas")}${tutorialTip("data-control","Tus datos siguen bajo tu control","Desde acá podés hacer backups, importar contactos y revisar la salud del workspace. No necesitás entrar seguido.")}<div class="data-layout v06-data-layout"><aside class="data-nav v06-data-nav">${[["info","archive","Mi información"],["system","shield","Sistema"],["account","person","Cuenta"],["advanced","database","Avanzado"]].map(([id,ic,label])=>`<button class="${tab===id?"active":""}" data-action="data-tab" data-value="${id}">${icon(ic,14)} ${label}</button>`).join("")}</aside><section class="data-content">${content}</section></div>`;
 }
 
 function relationshipTimeline(person){
@@ -893,21 +929,66 @@ function hideAuth() {
 }
 
 function showOnboarding(step=ui.onboardingStep) {
-  ui.onboardingStep=Math.max(0,Math.min(2,step));
+  ui.onboardingStep=Math.max(0,Math.min(1,step));
   onboardingShell.classList.add("open");
   onboardingShell.setAttribute("aria-hidden","false");
   const hasCurrent=store.people.length>0;
-  const progress=[0,1,2].map(i=>`<i class="${i<=ui.onboardingStep?"active":""}"></i>`).join("");
+  const progress=[0,1].map(i=>`<i class="${i<=ui.onboardingStep?"active":""}"></i>`).join("");
   let body="";
+
   if(ui.onboardingStep===0){
-    body=`<div class="onboard-hero v06-onboard-hero"><span class="eyebrow">INTELIGENCIA RELACIONAL</span><h1>Tu red ya contiene oportunidades que probablemente no estás viendo.</h1><p>ORBITA convierte contexto real en mejores decisiones, sin transformar personas en leads ni inventar conexiones.</p><div class="onboard-loop"><span>OBJETIVO</span><i>→</i><span>RED</span><i>→</i><span>EVIDENCIA</span><i>→</i><span>OPORTUNIDAD</span><i>→</i><span>ACCIÓN</span></div><div class="onboard-primary-actions"><button class="auth-primary" data-action="onboarding-next">CREAR MI ÓRBITA →</button><button class="btn btn-ghost" data-action="onboarding-finish" data-value="demo">EXPLORAR DEMO</button></div></div>`;
-  }else if(ui.onboardingStep===1){
-    body=`<form id="onboarding-profile-form" class="onboard-form v06-onboard-form"><span class="eyebrow">01 · TU ESPACIO</span><h2>Primero, ubicá tu contexto.</h2><p>Solo lo mínimo para que la experiencia se sienta propia.</p><div class="form-grid"><label class="form-field"><span>NOMBRE</span><input name="name" required value="${esc(store.profile.name==="Mi espacio"?"":store.profile.name)}" placeholder="Iván"/></label><label class="form-field"><span>ROL</span><input name="role" value="${esc(store.profile.role)}" placeholder="Founder"/></label><label class="form-field wide"><span>PROYECTO / EMPRESA</span><input name="focus" value="${esc(store.profile.focus==="Networking profesional"?"":store.profile.focus)}" placeholder="SØD Ecosystem"/></label></div><div class="onboard-actions"><button type="button" class="btn btn-ghost" data-action="onboarding-back">ATRÁS</button><button class="btn btn-primary" type="submit">CONTINUAR →</button></div></form>`;
+    body=`<div class="onboard-hero v062-onboard-hero">
+      <div class="onboard-hero-copy">
+        <span class="eyebrow">TU RED, LEÍDA SEGÚN LO QUE QUERÉS LOGRAR</span>
+        <h1>Decime qué querés lograr. ORBITA te muestra quién de tu red puede ayudarte, por qué y qué hacer después.</h1>
+        <p>Tu red no necesita otra agenda. Necesita contexto, memoria y una forma clara de encontrar oportunidades reales.</p>
+        <div class="onboard-loop v062-onboard-loop"><span>OBJETIVO</span><i>→</i><span>RED</span><i>→</i><span>EVIDENCIA</span><i>→</i><span>ACCIÓN</span></div>
+      </div>
+      <div class="onboard-choice-grid">
+        <button class="onboard-choice-card primary" data-action="onboarding-finish" data-value="demo">
+          <span class="choice-kicker">VER VALOR AHORA</span>
+          <strong>PROBAR CON UNA RED DEMO</strong>
+          <p>Entrá directo a una red con contexto y un objetivo listo para analizar.</p>
+          <b>EXPLORAR ORBITA →</b>
+        </button>
+        <button class="onboard-choice-card" data-action="onboarding-next">
+          <span class="choice-kicker">USAR MI CONTEXTO</span>
+          <strong>EMPEZAR CON MI RED</strong>
+          <p>Definí qué querés lograr y después agregá una persona o importá contactos.</p>
+          <b>EMPEZAR →</b>
+        </button>
+      </div>
+      <small class="onboard-reassurance">Sin configuración obligatoria. Podés editar tu perfil y preferencias después.</small>
+    </div>`;
   }else{
-    body=`<form id="onboarding-goal-form" class="onboard-form v06-goal-onboarding"><span class="eyebrow">02 · OBJETIVO ACTUAL</span><h2>¿Qué querés lograr ahora?</h2><p>Podés cambiarlo cuando quieras. ORBITA usa este objetivo para ordenar la red por relevancia contextual.</p><label class="onboard-goal-field"><textarea name="goal" rows="3" maxlength="280" required placeholder="Estoy levantando una ronda pre-seed">${esc(store.profile.currentGoal||"")}</textarea></label><div class="goal-examples"><button type="button" data-action="goal-example" data-value="Encontrar clientes">Encontrar clientes</button><button type="button" data-action="goal-example" data-value="Buscar inversores">Buscar inversores</button><button type="button" data-action="goal-example" data-value="Conseguir feedback">Conseguir feedback</button><button type="button" data-action="goal-example" data-value="Encontrar talento">Encontrar talento</button></div><div class="onboard-actions"><button type="button" class="btn btn-ghost" data-action="onboarding-back">ATRÁS</button><button class="btn btn-acid" type="submit">ENTRAR A MI RED →</button></div>${hasCurrent?`<small class="onboard-existing">Tus ${store.people.length} relaciones actuales se conservan.</small>`:""}</form>`;
+    body=`<form id="onboarding-goal-form" class="onboard-form v062-goal-onboarding">
+      <span class="eyebrow">01 · TU OBJETIVO</span>
+      <h2>¿Qué querés lograr ahora?</h2>
+      <p>Ese objetivo es la lente con la que ORBITA va a leer tu red. Podés cambiarlo cuando quieras.</p>
+      <label class="onboard-goal-field"><textarea name="goal" rows="3" maxlength="280" required autofocus placeholder="Ej: Estoy buscando clientes para mi consultora de IA">${esc(store.profile.currentGoal||"")}</textarea></label>
+      <div class="goal-examples">
+        <button type="button" data-action="goal-example" data-value="Conseguir clientes">Conseguir clientes</button>
+        <button type="button" data-action="goal-example" data-value="Buscar inversores">Buscar inversores</button>
+        <button type="button" data-action="goal-example" data-value="Encontrar talento">Encontrar talento</button>
+        <button type="button" data-action="goal-example" data-value="Pedir feedback sobre mi pitch">Pedir feedback</button>
+      </div>
+      <div class="onboard-value-preview">
+        <span>DESPUÉS ORBITA TE VA A MOSTRAR</span>
+        <div><b>01</b> quién puede ser relevante</div>
+        <div><b>02</b> qué evidencia lo sostiene</div>
+        <div><b>03</b> cuál podría ser tu próximo movimiento</div>
+      </div>
+      <div class="onboard-actions">
+        <button type="button" class="btn btn-ghost" data-action="onboarding-back">ATRÁS</button>
+        <button class="btn btn-acid" type="submit">ANALIZAR MI RED →</button>
+      </div>
+      ${hasCurrent?`<small class="onboard-existing">Tus ${store.people.length} relaciones actuales se conservan.</small>`:""}
+    </form>`;
   }
-  onboardingContent.innerHTML=`<section class="onboard-shell v06-onboard-shell"><header><div class="onboard-brand"><img src="/assets/orbita-mark.svg" alt=""/><strong>ORBITA</strong></div><div class="onboard-progress">${progress}</div>${hasCurrent?`<button class="onboard-skip" data-action="onboarding-finish" data-value="keep">Cerrar</button>`:"<span></span>"}</header>${body}</section>`;
+
+  onboardingContent.innerHTML=`<section class="onboard-shell v062-onboard-shell"><header><div class="onboard-brand"><img src="/assets/orbita-mark.svg" alt=""/><strong>ORBITA</strong></div><div class="onboard-progress">${progress}</div>${hasCurrent?`<button class="onboard-skip" data-action="onboarding-finish" data-value="keep">Cerrar</button>`:"<span></span>"}</header>${body}</section>`;
   hydrateIcons(onboardingContent);
+  setTimeout(()=>onboardingContent.querySelector("textarea,button")?.focus(),40);
 }
 
 function hideOnboarding() {
@@ -919,16 +1000,20 @@ function finishOnboarding(mode = "keep") {
   const profile = { ...store.profile };
   if (mode === "demo") {
     store = normalizeStore(deepClone(seedStore));
-    if (!profile.currentGoal) profile.currentGoal = "Estoy levantando una ronda pre-seed";
+    profile.currentGoal = profile.currentGoal || "Estoy levantando una ronda pre-seed";
+    ui.networkMode = "goal";
   }
   else if (mode === "legacy") store = legacyStore() || store;
   else if (mode === "empty") store = normalizeStore({ profile, people: [], interactions: [], commitments: [], opportunities: [], meetings: [] });
   store.profile = { ...store.profile, ...profile, onboardingComplete: true };
   hideOnboarding();
-  saveStore("Tu espacio está listo");
+  saveStore(mode === "demo" ? "Demo lista · explorá las oportunidades" : "Tu espacio está listo");
   if (!store.people.length) {
     go("people");
-    setTimeout(() => openEntityForm("person"), 180);
+    renderCurrentRoute();
+  } else {
+    go("today");
+    renderCurrentRoute();
   }
 }
 
@@ -941,9 +1026,9 @@ function openDeleteAccountModal() {
 
 function openHelp(topic = currentRoute()) {
   const guides = {
-    today: ["HOY", "Tu centro de mando", "Acá viven tu objetivo actual, oportunidades explicables y relaciones que necesitan atención. No es un feed: debería ayudarte a decidir qué hacer."],
+    today: ["HOY", "Empezá por lo que querés lograr", "Definí un objetivo concreto. ORBITA cruza ese objetivo con el contexto registrado y te muestra oportunidades explicables."],
     people: ["PERSONAS", "Tu memoria relacional", "Abrí cualquier persona para editar contexto, registrar interacciones, compromisos y oportunidades."],
-    network: ["RED", "Una vista, no un ranking", "Los círculos los definís vos. ORBITA no asigna valor humano automáticamente ni convierte vínculos en puntajes."],
+    network: ["RED", "Relevancia según tu objetivo", "ORBITA destaca relaciones cuando existe evidencia útil para lo que querés lograr. No mide el valor de una persona."],
     data: ["DATOS", "Control y portabilidad", "Exportá JSON/CSV/Markdown, auditá el estado, revisá la cuenta y controlá dónde se guarda tu información."]
   };
   const [label,title,body] = guides[topic] || guides.today;
@@ -1059,6 +1144,7 @@ async function handleAction(target) {
   else if (action === "onboarding-next") showOnboarding(ui.onboardingStep + 1);
   else if (action === "onboarding-back") showOnboarding(ui.onboardingStep - 1);
   else if (action === "onboarding-finish") finishOnboarding(el.dataset.value || "keep");
+  else if (action === "dismiss-tutorial") { dismissTutorial(id); el.closest(".tutorial-tip")?.remove(); }
   else if (action === "open-help") openHelp(currentRoute());
   else if (action === "start-onboarding") { closeDrawer(); showOnboarding(0); }
   else if (action === "sync-now") await syncNow();
@@ -1187,12 +1273,6 @@ document.addEventListener("submit", async event => {
       toast(error.message || "No pudimos eliminar la cuenta.", "warn");
     }
     return;
-  }
-  if (form.id === "onboarding-profile-form") {
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(form).entries());
-    store.profile = { ...store.profile, name: String(data.name).trim() || "Mi espacio", role: String(data.role || "").trim(), focus: String(data.focus || "").trim() };
-    showOnboarding(2); return;
   }
   if (form.id === "onboarding-goal-form") {
     event.preventDefault();
