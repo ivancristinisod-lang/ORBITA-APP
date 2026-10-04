@@ -1,47 +1,33 @@
-# ORBITA — Relational Intelligence MVP V0.5
+# ORBITA APP — Relational Intelligence
 
-ORBITA es un agente de inteligencia relacional orientado inicialmente a founders y emprendedores. El producto sigue siendo **manual-first** mientras validamos qué contexto relacional produce valor recurrente.
+ORBITA es un agente de inteligencia relacional para founders y emprendedores.
 
-Este paquete corresponde a **V0.5.2**, un patch de seguridad/cloud sobre la generación V0.5.
+Convierte un objetivo actual + el contexto de tu red en oportunidades priorizadas, explicables y accionables:
 
-## Producto actual
+**OBJETIVO → RED → EVIDENCIA → OPORTUNIDAD → ACCIÓN**
 
-- **01 HOY** — señales y próximos movimientos.
-- **02 PERSONAS** — relaciones, historial, contexto y CRUD completo.
-- **03 RED** — mapa/círculos relacionales.
-- **04 AGENDA** — Día / Semana / Mes + Meeting Brief.
-- **05 DATOS** — actividad, oportunidades, import/export, auditoría y configuración.
-- Captura manual global.
-- Búsqueda `Ctrl/Cmd + K`.
-- JSON / CSV / Markdown portability.
-- Onboarding y ayuda contextual.
-- Modo local explícito.
-- **Agente relacional explicable**: objetivo → ranking → evidencia → acción.
-- Motor determinístico local con protección contra falsos positivos.
-- Base Solana privacy-minimal en `solana.js` (hash/memo/Explorer devnet; wallet y broadcast aún pendientes).
-- Supabase Auth + cloud sync cuando producción recibe la configuración.
+## Estado actual
 
-## Cloud baseline
+**Versión:** V0.5.2 Functional Alpha  
+**Arquitectura:** local-first, backend-ready  
+**Deploy:** Vercel  
+**Producción:** https://orbita-app-kappa.vercel.app
 
-El proyecto Supabase ORBITA ya está provisionado. La base usa:
+### Producto
+- HOY — señales, objetivo actual y agente relacional.
+- PERSONAS — relaciones, historial y CRUD.
+- RED — mapa/círculos relacionales.
+- AGENDA — Día / Semana / Mes + Meeting Brief.
+- DATOS — actividad, oportunidades, import/export, auditoría y configuración.
+- Ranking relacional explicable con separación entre hechos e inferencias.
+- Protección contra falsos positivos.
+- Persistencia local.
+- Supabase Auth + cloud sync preparados detrás de stage gate.
+- Adaptador Solana privacy-minimal en `solana.js`; wallet/firma/broadcast todavía no forman parte del estado productivo.
 
-```text
-Auth user
-   ↓
-orbita_workspaces.user_id
-   ↓
-workspace JSONB
-   + server revision
-   + server timestamps
-```
+## Desarrollo local
 
-RLS + FORCE RLS aíslan cada usuario. Los writes cloud usan revisión optimista para evitar que un dispositivo obsoleto sobrescriba silenciosamente datos más recientes.
-
-La arquitectura JSONB es intencional para el MVP y puede normalizarse cuando uso real justifique el costo.
-
-## Local
-
-Node compatible: 22–24. CI/deploy objetivo: Node 24.
+Requiere Node 22–24. CI y deploy usan Node 24.
 
 ```bash
 npm run dev
@@ -49,46 +35,73 @@ npm run dev
 
 Abrí `http://localhost:4173`.
 
-Sin variables cloud, ORBITA muestra **Modo local** y guarda solamente en el navegador.
-
-## Validación
+Validación completa:
 
 ```bash
 npm run validate
 ```
 
-Incluye checks de arquitectura/seguridad, cobertura de acciones UI, tests de dominio, sintaxis y build.
-
-## Vercel
+## Build / Vercel
 
 ```text
 npm run build → dist/
 ```
 
-Para activar cloud Auth en producción ver **`AUTH-SETUP.md`**. Variables públicas requeridas:
+Vercel construye desde `main`.
+
+## Cloud stage gate
+
+ORBITA funciona sin backend como **LOCAL ALPHA**.
+
+Cloud solo se activa cuando:
 
 ```text
-ORBITA_SUPABASE_URL
-ORBITA_SUPABASE_PUBLISHABLE_KEY
-ORBITA_APP_URL
+ORBITA_ENABLE_CLOUD=true
+ORBITA_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+ORBITA_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+ORBITA_APP_URL=https://orbita-app-kappa.vercel.app
 ```
 
-Nunca agregues `sb_secret_*` o `service_role` al navegador.
+Nunca exponer `sb_secret_*` ni `service_role` en browser.
 
-## Supabase source of truth
+## Estructura
 
-- Fresh-install snapshot: `supabase/schema.sql`
-- Applied production history: `supabase/migrations/`
-- Privileged account deletion: `supabase/functions/delete-account/index.ts`
+```text
+/
+├─ index.html
+├─ app.js
+├─ core.js
+├─ seed.js
+├─ auth.js
+├─ cloud.js
+├─ solana.js
+├─ styles.css
+├─ build.mjs
+├─ check.mjs
+├─ tests.mjs
+├─ .github/workflows/validate.yml
+├─ supabase/
+│  ├─ schema.sql
+│  ├─ migrations/
+│  └─ functions/delete-account/index.ts
+└─ docs/
+   └─ archive/
+```
 
-No edites producción manualmente sin reflejar el cambio como migración.
+### Supabase source of truth
+- Fresh install: `supabase/schema.sql`
+- Historial aplicado: `supabase/migrations/`
+- Operación privilegiada: `supabase/functions/delete-account/index.ts`
+
+### Documentación
+Los documentos vigentes permanecen en raíz para acceso rápido. Versiones históricas/superseded viven en `docs/archive/`.
 
 ## Seguridad
 
 Ver:
-
 - `SECURITY.md`
 - `AUDIT-REPORT-V0.5.md`
 - `AUTH-SETUP.md`
+- `ARCHITECTURE-DECISIONS.md`
 
-La V0.5 tiene una frontera explícita: las sesiones client-only todavía viven en localStorage. Antes de ingestión automática de datos especialmente sensibles o una expansión pública importante, ORBITA debe revisar/migrar a una arquitectura de sesión server-assisted/HttpOnly.
+Regla no negociable: una operación privilegiada nunca se resuelve moviendo credenciales administrativas al navegador.

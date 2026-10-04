@@ -17,12 +17,12 @@ Do **not** run the old SQL manually against this project. The applied production
 
 ## Manual step 1 — Vercel environment variables
 
-In **Vercel → orbita → Settings → Environment Variables**, add these to **Production**:
+In **Vercel → orbita-app → Settings → Environment Variables**, add these to **Production**:
 
 ```text
 ORBITA_SUPABASE_URL=https://tbxrglthrieafejxjecm.supabase.co
 ORBITA_SUPABASE_PUBLISHABLE_KEY=<default publishable key from Supabase → Connect / API Keys>
-ORBITA_APP_URL=https://orbita-ten-khaki.vercel.app
+ORBITA_APP_URL=https://orbita-app-kappa.vercel.app
 ```
 
 Use the modern `sb_publishable_...` key. Do not use a secret key or `service_role`.
@@ -35,10 +35,10 @@ In **Supabase → ORBITA → Authentication → URL Configuration**:
 
 ```text
 Site URL
-https://orbita-ten-khaki.vercel.app
+https://orbita-app-kappa.vercel.app
 
 Redirect URL
-https://orbita-ten-khaki.vercel.app
+https://orbita-app-kappa.vercel.app
 ```
 
 For now, keep production exact. Add preview URLs only when we deliberately create a staging auth strategy; do not use a broad production wildcard for convenience.
