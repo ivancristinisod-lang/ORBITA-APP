@@ -2,13 +2,13 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const ALLOWED_ORIGINS = new Set([
-  "https://orbita-ten-khaki.vercel.app",
-  "https://orbita-kadmontech-9060s-projects.vercel.app",
+  "https://orbita-app-kappa.vercel.app",
+  "https://orbita-app-ivancristinisod.vercel.app",
   "http://localhost:4173"
 ]);
 
 function cors(origin: string | null) {
-  const allowed = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://orbita-ten-khaki.vercel.app";
+  const allowed = origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://orbita-app-kappa.vercel.app";
   return {
     "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

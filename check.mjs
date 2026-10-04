@@ -6,7 +6,7 @@ const root = process.cwd();
 const required = [
   "index.html", "styles.css", "app.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "orbita-mark.svg", "orbita-logo.png",
   "vercel.json", "package.json", "README.md", "PROJECT_STATUS.md", "QA-REPORT.md", "ORBITA_CANON_V0.5.md",
-  "AUTH-SETUP.md", "SECURITY.md", "AUDIT-REPORT-V0.5.md", ".env.example", "SUPABASE-SCHEMA.sql",
+  "AUTH-SETUP.md", "SECURITY.md", "AUDIT-REPORT-V0.5.md", ".env.example",
   "supabase/schema.sql",
   "supabase/migrations/20260815153417_orbita_v05_hardened_workspace.sql",
   "supabase/migrations/20260815153451_orbita_v05_optimize_rls_initplans.sql",
