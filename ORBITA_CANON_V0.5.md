@@ -1,6 +1,6 @@
 # ORBITA CANON — V0.5
 
-Status: **ACTIVE / HQ APPROVED DIRECTION**
+Status: **SUPERSEDED / HISTORICAL — use `ORBITA_CANON_V0.6.1.md` as current source of truth**
 
 ## Definition
 
