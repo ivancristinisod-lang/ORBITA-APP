@@ -8,17 +8,18 @@ Convierte un objetivo actual + el contexto de tu red en oportunidades priorizada
 
 ## Estado actual
 
-**Versión:** V0.5.2 Functional Alpha  
+**Versión:** V0.6 Experience Upgrade — release candidate  
 **Arquitectura:** local-first, backend-ready  
 **Deploy:** Vercel  
 **Producción:** https://orbita-app-kappa.vercel.app
 
 ### Producto
-- HOY — señales, objetivo actual y agente relacional.
-- PERSONAS — relaciones, historial y CRUD.
-- RED — mapa/círculos relacionales.
-- AGENDA — Día / Semana / Mes + Meeting Brief.
-- DATOS — actividad, oportunidades, import/export, auditoría y configuración.
+- HOY — objetivo actual, ranking explicable y cola priorizada de atención.
+- PERSONAS — relaciones escaneables e historia longitudinal.
+- RED — vista orbital general + modo por objetivo.
+- AGENDA — reuniones con contexto relacional + calendario secundario.
+- DATOS — información, sistema, cuenta y herramientas avanzadas.
+- CAPTURAR — entrada libre “¿Qué pasó?” que conserva CRUD estructurado.
 - Ranking relacional explicable con separación entre hechos e inferencias.
 - Protección contra falsos positivos.
 - Persistencia local.
@@ -79,6 +80,7 @@ Nunca exponer `sb_secret_*` ni `service_role` en browser.
 ├─ build.mjs
 ├─ check.mjs
 ├─ tests.mjs
+├─ ORBITA_V0.6_EXPERIENCE.md
 ├─ .github/workflows/validate.yml
 ├─ supabase/
 │  ├─ schema.sql
@@ -94,7 +96,7 @@ Nunca exponer `sb_secret_*` ni `service_role` en browser.
 - Operación privilegiada: `supabase/functions/delete-account/index.ts`
 
 ### Documentación
-Los documentos vigentes permanecen en raíz para acceso rápido. Versiones históricas/superseded viven en `docs/archive/`.
+Los documentos vigentes permanecen en raíz para acceso rápido. La especificación de experiencia V0.6 vive en `ORBITA_V0.6_EXPERIENCE.md`. Versiones históricas/superseded viven en `docs/archive/`.
 
 ## Seguridad
 
