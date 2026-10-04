@@ -102,6 +102,175 @@ function hydrateIcons(scope = document) {
   scope.querySelectorAll("[data-icon]").forEach(el => { el.innerHTML = icon(el.dataset.icon); });
 }
 
+function esc(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function safeExternalUrl(value = "") {
+  try {
+    const url = new URL(String(value));
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "#";
+  } catch {
+    return "#";
+  }
+}
+
+function passwordPolicyError(value = "") {
+  const password = String(value);
+  if (password.length < 12) return "Usá al menos 12 caracteres.";
+  if (!/[a-z]/.test(password)) return "Agregá al menos una minúscula.";
+  if (!/[A-Z]/.test(password)) return "Agregá al menos una mayúscula.";
+  if (!/[0-9]/.test(password)) return "Agregá al menos un número.";
+  if (!/[^A-Za-z0-9]/.test(password)) return "Agregá al menos un símbolo.";
+  return "";
+}
+
+function storageKey() {
+  const scope = authSession?.mode === "cloud" ? authSession.user?.id : "local";
+  return `${STORAGE_PREFIX}.${scope || "local"}`;
+}
+
+function syncMetaKey() {
+  const scope = authSession?.mode === "cloud" ? authSession.user?.id : "local";
+  return `${SYNC_META_PREFIX}.${scope || "local"}`;
+}
+
+function readSyncMeta() {
+  if (authSession?.mode !== "cloud") return null;
+  try {
+    const raw = localStorage.getItem(syncMetaKey());
+    const meta = raw ? JSON.parse(raw) : null;
+    return meta && Number(meta.revision) >= 1 ? meta : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSyncMeta(result, localUpdatedAt = store.updatedAt) {
+  if (authSession?.mode !== "cloud" || !result?.revision) return;
+  const meta = {
+    revision: Number(result.revision),
+    serverUpdatedAt: result.updatedAt || "",
+    localUpdatedAt: localUpdatedAt || "",
+    savedAt: new Date().toISOString()
+  };
+  try { localStorage.setItem(syncMetaKey(), JSON.stringify(meta)); } catch { /* cache metadata is best-effort */ }
+}
+
+function persistLocalSnapshot(snapshot = store) {
+  try {
+    localStorage.setItem(storageKey(), JSON.stringify(snapshot));
+    return true;
+  } catch {
+    toast("No pude guardar en este navegador. Exportá un backup antes de continuar.", "warn");
+    return false;
+  }
+}
+
+function legacyStore() {
+  try {
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    return raw ? normalizeStore(JSON.parse(raw)) : null;
+  } catch { return null; }
+}
+
+function hasLocalSnapshot() {
+  try { return Boolean(localStorage.getItem(storageKey())); } catch { return false; }
+}
+
+function loadStore({ allowLegacy = false } = {}) {
+  try {
+    const raw = localStorage.getItem(storageKey());
+    if (raw) return normalizeStore(JSON.parse(raw));
+    if (allowLegacy) {
+      const legacy = legacyStore();
+      if (legacy) return legacy;
+    }
+  } catch { /* normalization fallback below */ }
+  return normalizeStore({});
+}
+
+function setSyncStatus(status, label = "") {
+  syncStatus = status;
+  if (!syncChip || !syncLabel) return;
+  syncChip.dataset.status = status;
+  syncLabel.textContent = label || (status === "synced" ? "SINCRONIZADO" : status === "syncing" ? "GUARDANDO…" : status === "error" ? "ERROR SYNC" : "EN ESTE DISPOSITIVO");
+}
+
+function saveStore(message = "Guardado", { sync = true } = {}) {
+  store.updatedAt = new Date().toISOString();
+  const persisted = persistLocalSnapshot(store);
+  if (authSession?.mode === "cloud" && sync) scheduleCloudSync();
+  else setSyncStatus("local");
+  renderCurrentRoute();
+  updateSignalBadge();
+  if (message && persisted) toast(message);
+  return persisted;
+}
+
+function handleCloudConflict(error, { quiet = false } = {}) {
+  console.error("ORBITA cloud conflict", error);
+  setSyncStatus("error", "CONFLICTO");
+  if (!quiet) toast("Hay cambios en otro dispositivo. ORBITA no los pisó. Exportá un backup y recargá para resolver.", "warn");
+}
+
+function scheduleCloudSync() {
+  clearTimeout(syncTimer);
+  setSyncStatus("syncing");
+  syncTimer = setTimeout(async () => {
+    try {
+      const session = authSession;
+      if (!session?.user?.id) return;
+      const result = await saveCloudWorkspace(session.user.id, store, cloudRevision);
+      cloudRevision = result.revision;
+      writeSyncMeta(result);
+      setSyncStatus("synced");
+    } catch (error) {
+      if (error instanceof CloudConflictError) return handleCloudConflict(error);
+      console.error("ORBITA cloud sync", error);
+      setSyncStatus("error");
+      toast("Tus cambios quedaron guardados en este dispositivo, pero no pude sincronizarlos.", "warn");
+    }
+  }, 700);
+}
+
+async function syncNow({ quiet = false } = {}) {
+  if (authSession?.mode !== "cloud" || !authSession.user?.id) {
+    setSyncStatus("local");
+    if (!quiet) toast("Tus datos están guardados en este dispositivo.");
+    return false;
+  }
+  try {
+    setSyncStatus("syncing");
+    const result = await saveCloudWorkspace(authSession.user.id, store, cloudRevision);
+    cloudRevision = result.revision;
+    writeSyncMeta(result);
+    setSyncStatus("synced");
+    if (!quiet) toast("Espacio sincronizado");
+    return true;
+  } catch (error) {
+    if (error instanceof CloudConflictError) { handleCloudConflict(error, { quiet }); return false; }
+    console.error(error);
+    setSyncStatus("error");
+    if (!quiet) toast("No pude sincronizar. Tus datos de este dispositivo siguen a salvo.", "warn");
+    return false;
+  }
+}
+
+function currentRoute() {
+  const route = location.hash.replace(/^#\/?/, "").split("?")[0];
+  return ROUTES[route] ? route : "today";
+}
+
+function go(route) {
+  location.hash = `#/${route}`;
+}
+
 function pageHead(index, title, description = "", actions = "") {
   const help = `<button class="icon-btn page-help" data-action="open-help" aria-label="Ayuda sobre ${esc(title)}" title="Ayuda">${icon("help",17)}</button>`;
   return `<header class="page-head"><div class="page-title-wrap"><span class="page-index">${esc(index)}</span><div><h1>${esc(title)}</h1>${description ? `<p>${esc(description)}</p>` : ""}</div></div><div class="page-actions">${actions}${help}</div></header>`;
