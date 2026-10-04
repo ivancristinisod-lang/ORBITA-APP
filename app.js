@@ -309,7 +309,7 @@ function renderCurrentRoute() {
   viewRoot.innerHTML=renderer(); hydrateIcons(viewRoot); viewRoot.focus({preventScroll:true}); closeMobileNav();
 }
 function updateSignalBadge() {
-  const count = computeSignals(store).length;
+  const count = computeSignals(store).filter(signal => signal.type !== "meeting").length;
   const badge = document.querySelector("#today-badge");
   badge.textContent = count ? String(Math.min(count, 99)) : "";
   badge.hidden = !count;
@@ -359,7 +359,7 @@ function relationalGoalPanel() {
       results.length ? `<div class="ranked-opportunities">
         <div class="ranked-opportunities-head"><div><span class="eyebrow">OPORTUNIDADES PARA TU OBJETIVO</span><strong>${results.length} relación${results.length===1?"":"es"} con evidencia suficiente</strong></div><small>Ordenadas por relevancia contextual</small></div>
         <div class="opportunity-rank-list">${results.slice(0,3).map((result,index)=>relationalOpportunityCard(result,index)).join("")}</div>
-        ${results.length>3?`<button class="text-btn opportunity-all" data-route="network">VER LA RED POR OBJETIVO →</button>`:""}
+        ${results.length>3?`<button class="text-btn opportunity-all" data-action="open-goal-network">VER LA RED POR OBJETIVO →</button>`:""}
       </div>` :
       `<div class="agent-no-match"><strong>NO ENCONTRÉ EVIDENCIA SUFICIENTE</strong><p>Con los datos registrados no puedo sostener una recomendación para “${esc(goal)}”. Agregá contexto real o probá otro objetivo.</p></div>`
     }
@@ -380,7 +380,7 @@ function relationalOpportunityCard(result, index) {
     <div class="opportunity-rank-score"><strong>${result.relevance_score}</strong><span>RELEVANCIA</span></div>
     <div class="opportunity-rank-actions">
       <button class="btn btn-acid" data-action="agent-opportunity" data-id="${esc(person.id)}">VER POR QUÉ</button>
-      <button class="btn btn-ghost" data-action="open-person" data-id="${esc(person.id)}">PREPARAR ACCIÓN</button>
+      <button class="btn btn-ghost" data-action="open-person" data-id="${esc(person.id)}">ABRIR RELACIÓN</button>
     </div>
   </article>`;
 }
@@ -437,36 +437,60 @@ function peopleView(){
 
 function personRow(p){
   const last=lastInteraction(store,p.id),rel=relationshipState(store,p),pending=openCommitmentsFor(store,p.id).length;
-  return `<article class="person-row v06-person-row" data-action="open-person" data-id="${esc(p.id)}" tabindex="0">
+  return `<button class="person-row v06-person-row" data-action="open-person" data-id="${esc(p.id)}" aria-label="Abrir relación con ${esc(p.name)}">
     <div class="person-main">${avatar(p)}<div><strong>${esc(p.name)}</strong><span>${esc(personMeta(p))}</span></div></div>
     <div class="person-cell-secondary"><span>ÚLTIMO CONTACTO</span><strong>${esc(last?formatRelative(last.date):"Sin historial")}</strong></div>
     <div class="person-cell-secondary"><span>ESTADO</span>${statePill(rel)}</div>
     <div class="person-relationship-meta">${circlePill(p.circle)}${pending?`<span class="pending-count">${pending} pendiente${pending===1?"":"s"}</span>`:""}</div>
     <span class="row-open">${icon("arrow",16)}</span>
-  </article>`;
+  </button>`;
 }
 
 function networkView(){
-  const people=store.people.filter(p=>ui.networkFilter==="Todos"||p.circle===ui.networkFilter);
-  const circles=["Cercano","Estratégico","Activo","Nuevo"],radii={Cercano:18,"Estratégico":29,Activo:39,Nuevo:47},grouped=Object.fromEntries(circles.map(c=>[c,people.filter(p=>p.circle===c)]));
   const goal=store.profile.currentGoal||"";
-  const ranked=ui.networkMode==="goal"&&goal.trim()?buildRelationalOpportunities(store,goal):[];
+  const hasGoal=Boolean(goal.trim());
+  const goalMode=ui.networkMode==="goal";
+
+  if(goalMode&&!hasGoal){
+    return `${pageHead("03","RED","Leé tu red desde lo que querés lograr")}
+      <section class="network-goal-empty">
+        <span class="eyebrow">RED PARA TU OBJETIVO</span>
+        <h2>Definí un objetivo para leer tu red.</h2>
+        <p>ORBITA necesita saber qué querés lograr para determinar qué relaciones son relevantes ahora.</p>
+        <div class="network-empty-actions">
+          <button class="btn btn-acid" data-action="define-goal">DEFINIR OBJETIVO</button>
+          <button class="btn btn-ghost" data-action="network-mode" data-value="all">VER RED COMPLETA</button>
+        </div>
+      </section>`;
+  }
+
+  const people=store.people.filter(p=>ui.networkFilter==="Todos"||p.circle===ui.networkFilter);
+  const circles=["Cercano","Estratégico","Activo","Nuevo"];
+  const radii={Cercano:18,"Estratégico":29,Activo:39,Nuevo:47};
+  const grouped=Object.fromEntries(circles.map(c=>[c,people.filter(p=>p.circle===c)]));
+  const ranked=goalMode&&hasGoal?buildRelationalOpportunities(store,goal):[];
   const rankMap=new Map(ranked.map((item,index)=>[item.contact_id,{...item,rank:index+1}]));
   const nodes=circles.flatMap(c=>grouped[c].map((p,i,a)=>{
-    const angle=((Math.PI*2)/Math.max(a.length,1))*i-Math.PI/2+circles.indexOf(c)*.55,r=radii[c],match=rankMap.get(p.id);
-    const relevanceClass=ui.networkMode==="goal"?(match?"goal-relevant":"goal-muted"):"";
+    const angle=((Math.PI*2)/Math.max(a.length,1))*i-Math.PI/2+circles.indexOf(c)*.55;
+    const r=radii[c],match=rankMap.get(p.id);
+    const relevanceClass=goalMode?(match?"goal-relevant":"goal-muted"):"";
     const rankLabel=match?` · #${match.rank} para tu objetivo`:"";
     return `<button class="network-node circle-node-${c.toLowerCase().replaceAll("é","e")} ${relevanceClass}" style="left:${50+Math.cos(angle)*r}%;top:${50+Math.sin(angle)*r}%" data-action="open-person" data-id="${esc(p.id)}" aria-label="Abrir ${esc(p.name)}" title="${esc(p.name)} · ${esc(personMeta(p))}${esc(rankLabel)}"><span class="node-avatar">${esc(initials(p.name))}</span>${match?`<b class="node-rank">0${match.rank}</b>`:""}</button>`;
   })).join("");
   const tags=topTags(4);
-  return `${pageHead("03","RED","Comprendé la estructura y relevancia de tu red")}
-    <section class="network-command">
-      <div class="network-modes" role="group" aria-label="Modo de red">
-        <button class="${ui.networkMode==="all"?"active":""}" data-action="network-mode" data-value="all">MI RED</button>
-        <button class="${ui.networkMode==="goal"?"active":""}" data-action="network-mode" data-value="goal" ${!goal.trim()?"disabled":""}>POR OBJETIVO</button>
+  const visibleSignals=computeSignals(store).filter(signal=>signal.type!=="meeting").length;
+
+  return `${pageHead("03","RED",goalMode?"Red para tu objetivo":"Vista completa de tus relaciones")}
+    <section class="network-command goal-first-command">
+      <div class="network-goal-context">
+        <span>${goalMode?"RED PARA TU OBJETIVO":"RED COMPLETA"}</span>
+        <strong>${goalMode?esc(goal):`${store.people.length} relaciones registradas`}</strong>
+        ${goalMode?`<small>${store.people.length} relaciones analizadas · ${ranked.length} con evidencia relevante</small>`:""}
       </div>
-      <div class="network-goal-context"><span>OBJETIVO</span><strong>${goal.trim()?esc(goal):"Definí un objetivo en HOY para activar este modo."}</strong></div>
-      <button class="btn btn-ghost" data-action="cycle-network-filter">${icon("filter")} ${esc(ui.networkFilter)}</button>
+      <div class="network-secondary-actions">
+        ${goalMode?`<button class="btn btn-ghost" data-action="network-mode" data-value="all">VER RED COMPLETA</button>`:`<button class="btn btn-acid" data-action="network-mode" data-value="goal" ${!hasGoal?"disabled":""}>VOLVER A RED POR OBJETIVO</button>`}
+        <button class="btn btn-ghost" data-action="cycle-network-filter">${icon("filter")} ${esc(ui.networkFilter)}</button>
+      </div>
     </section>
     <div class="network-v06-layout">
       <section class="network-stage">
@@ -477,9 +501,9 @@ function networkView(){
         <div class="network-legend">${circles.map(c=>`<span class="legend-${c.toLowerCase().replaceAll("é","e")}"><i></i>${esc(c)}</span>`).join("")}</div>
       </section>
       <aside class="network-intelligence">
-        <div><span class="eyebrow">${ui.networkMode==="goal"?"RELEVANCIA CONTEXTUAL":"LECTURA DE RED"}</span><h2>${ui.networkMode==="goal"?"Relaciones que sostienen tu objetivo":`${store.people.length} relaciones registradas`}</h2></div>
-        ${ui.networkMode==="goal" ? (ranked.length?`<div class="network-ranked-mini">${ranked.slice(0,5).map((item,index)=>{const p=personById(store,item.contact_id);return p?`<button data-action="agent-opportunity" data-id="${esc(p.id)}"><span>0${index+1}</span><div><strong>${esc(p.name)}</strong><small>${esc(item.reason)}</small></div><b>${item.relevance_score}</b></button>`:""}).join("")}</div>`:`<p class="muted-copy">No hay relaciones con evidencia suficiente para este objetivo.</p>`) :
-        `<div class="network-readout"><div><strong>${new Set(store.people.map(p=>p.company).filter(Boolean)).size}</strong><span>organizaciones</span></div><div><strong>${store.people.filter(p=>["Cercano","Estratégico"].includes(p.circle)).length}</strong><span>relaciones cercanas / estratégicas</span></div><div><strong>${computeSignals(store).length}</strong><span>señales activas</span></div></div><div class="topics-block"><span class="eyebrow">TEMAS PRESENTES</span><div class="topic-chips">${tags.map(t=>`<span class="topic-chip">${esc(t.name)} · ${t.count}</span>`).join("")||`<span class="muted-copy">Todavía no hay tags.</span>`}</div></div>`}
+        <div><span class="eyebrow">${goalMode?"RELEVANCIA CONTEXTUAL":"LECTURA DE RED"}</span><h2>${goalMode?"Relaciones relevantes para lo que querés lograr":`${store.people.length} relaciones registradas`}</h2></div>
+        ${goalMode ? (ranked.length?`<div class="network-ranked-mini">${ranked.slice(0,5).map((item,index)=>{const p=personById(store,item.contact_id);return p?`<button data-action="agent-opportunity" data-id="${esc(p.id)}"><span>0${index+1}</span><div><strong>${esc(p.name)}</strong><small>${esc(item.reason)}</small></div><b>${item.relevance_score}</b></button>`:""}).join("")}</div>`:`<p class="muted-copy">No hay relaciones con evidencia suficiente para este objetivo.</p>`) :
+        `<div class="network-readout"><div><strong>${new Set(store.people.map(p=>p.company).filter(Boolean)).size}</strong><span>organizaciones</span></div><div><strong>${store.people.filter(p=>["Cercano","Estratégico"].includes(p.circle)).length}</strong><span>relaciones cercanas / estratégicas</span></div><div><strong>${visibleSignals}</strong><span>señales activas</span></div></div><div class="topics-block"><span class="eyebrow">TEMAS PRESENTES</span><div class="topic-chips">${tags.map(t=>`<span class="topic-chip">${esc(t.name)} · ${t.count}</span>`).join("")||`<span class="muted-copy">Todavía no hay tags.</span>`}</div></div>`}
         <p class="network-trust-note">La prominencia visual representa contexto y relevancia para una tarea; no el valor de una persona.</p>
       </aside>
     </div>`;
@@ -955,7 +979,7 @@ async function enterApp(session, { recovery = false } = {}) {
         if (localChangedSinceSync && remoteAdvancedSinceSync) {
           store = local;
           setSyncStatus("error", "CONFLICTO");
-          toast("Detectamos cambios locales y remotos. ORBITA no sobrescribió ninguno automáticamente.", "warn");
+          toast("Detectamos cambios en este dispositivo y en tu cuenta. ORBITA no sobrescribió ninguno automáticamente.", "warn");
         } else if (localChangedSinceSync && !remoteAdvancedSinceSync) {
           store = local;
           scheduleCloudSync();
@@ -1027,6 +1051,8 @@ async function handleAction(target) {
   if (action === "auth-view") showAuth(el.dataset.value || "login");
   else if (action === "auth-local") { authSession = useLocalMode(); await enterApp(authSession); }
   else if (action === "focus-goal") { const input=document.querySelector("#relational-goal-input"); input?.focus(); input?.select(); }
+  else if (action === "open-goal-network") { ui.networkMode="goal"; go("network"); renderCurrentRoute(); }
+  else if (action === "define-goal") { ui.networkMode="goal"; go("today"); renderCurrentRoute(); setTimeout(()=>{ const input=document.querySelector("#relational-goal-input"); input?.focus(); input?.select(); },40); }
   else if (action === "goal-example") { const field=document.querySelector('#onboarding-goal-form textarea[name="goal"]'); if(field){ field.value=el.dataset.value||""; field.focus(); } }
   else if (action === "onboarding-next") showOnboarding(ui.onboardingStep + 1);
   else if (action === "onboarding-back") showOnboarding(ui.onboardingStep - 1);
@@ -1097,6 +1123,7 @@ document.addEventListener("submit", async event => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
     store.profile.currentGoal = String(data.goal || "").trim().slice(0, 280);
+    if (store.profile.currentGoal) ui.networkMode = "goal";
     saveStore(store.profile.currentGoal ? "Red analizada" : "Objetivo limpiado");
     return;
   }
@@ -1169,6 +1196,7 @@ document.addEventListener("submit", async event => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
     store.profile = { ...store.profile, currentGoal: String(data.goal || "").trim().slice(0,280) };
+    if (store.profile.currentGoal) ui.networkMode = "goal";
     finishOnboarding(store.people.length ? "keep" : "empty");
     return;
   }
