@@ -12,7 +12,7 @@ const required = [
   "supabase/migrations/20260815153451_orbita_v05_optimize_rls_initplans.sql",
   "supabase/migrations/20260815153845_orbita_v05_server_fields_and_revision.sql",
   "supabase/functions/delete-account/index.ts",
-  "ARCHITECTURE-DECISIONS.md", "PRODUCT-STAGE.md",
+  "ARCHITECTURE-DECISIONS.md", "PRODUCT-STAGE.md", "ORBITA_V0.6_EXPERIENCE.md",
   "solana.js", "CHANGELOG_HACKATHON.md", "DEMO.md", "ARCHITECTURE_HACKATHON.md", "SECURITY_HACKATHON.md",
   ".github/workflows/validate.yml"
 ];
@@ -32,7 +32,8 @@ const checks = [
   [html.includes('id="import-csv-file"'), "CSV input"],
   [css.includes("--acid:#dcff00"), "acid palette"],
   [css.includes("--blue:#2747ff"), "blue palette"],
-  [css.includes("ORBITA V0.5"), "V0.5 UX layer"],
+  [css.includes("ORBITA V0.5"), "V0.5 compatibility UX layer"],
+  [css.includes("ORBITA V0.6 — EXPERIENCE UPGRADE"), "V0.6 experience layer"],
   [css.includes(":focus-visible"), "keyboard focus"],
   [app.includes("function todayView"), "today route"],
   [app.includes("function peopleView"), "people route"],
@@ -58,6 +59,11 @@ const checks = [
   [core.includes("repairStore"), "data repair"],
   [core.includes("buildRelationalOpportunities"), "relational opportunity engine"],
   [app.includes('id="relational-goal-form"'), "founder goal UI"],
+  [app.includes("function attentionQueue"), "needs-attention queue"],
+  [app.includes("function relationshipTimeline"), "relationship timeline"],
+  [app.includes('action === "network-mode"'), "goal-aware network mode"],
+  [app.includes('id="capture-draft"'), "freeform relational capture"],
+  [app.includes('id="onboarding-goal-form"'), "goal-first onboarding"],
   [solana.includes("orbita:v1:introduction"), "privacy-minimal Solana memo adapter"],
   [auth.includes('/token?grant_type=password'), "password auth"],
   [auth.includes('/recover'), "password recovery"],
@@ -82,7 +88,7 @@ const checks = [
   [!vercel.includes("https://*.supabase.co"), "no wildcard Supabase CSP"],
   [vercel.includes('"value": "no-referrer"'), "private referrer policy"],
   [vercel.includes("no-store, max-age=0"), "runtime config no-store"],
-  [pkg.includes('"version":"0.5.2"'), "patch version"],
+  [pkg.includes('"version":"0.6.0"'), "V0.6 version"],
   [pkg.includes('"node":">=22 <25"'), "Node range"],
   [workflow.includes("node-version: 24"), "CI Node 24"]
 ];
