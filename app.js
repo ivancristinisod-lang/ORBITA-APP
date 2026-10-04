@@ -1,8 +1,8 @@
 import { seedStore } from "./seed.js";
 import {
   deepClone, makeId, normalizeStore, personById, interactionsFor, lastInteraction,
-  relationshipState, openCommitmentsFor, opportunitiesFor, upcomingMeetings,
-  computeSignals, buildMeetingBrief, formatDate, formatDateTime, formatRelative,
+  relationshipState, openCommitmentsFor, opportunitiesFor,
+  computeSignals, formatDate, formatRelative,
   peopleToCSV, reportToMarkdown, parseContactsCSV, auditStore, repairStore, buildRelationalOpportunities
 } from "./core.js";
 import { bootstrapAuth, cloudIsConfigured, hydrateUser, requestPasswordReset, signIn, signOut, signUp, updatePassword, useLocalMode } from "./auth.js";
@@ -15,7 +15,6 @@ const ROUTES = {
   today: "Hoy",
   people: "Personas",
   network: "Red",
-  agenda: "Agenda",
   data: "Datos"
 };
 
@@ -23,11 +22,11 @@ const ui = {
   peopleQuery: "",
   circleFilter: "Todos",
   networkFilter: "Todos",
+  networkMode: "goal",
+  captureDraft: "",
   capturePersonId: "",
   captureKind: "",
-  agendaMode: "week",
-  agendaAnchor: new Date().toISOString().slice(0,10),
-  dataTab: "summary",
+  dataTab: "info",
   onboardingStep: 0
 };
 
@@ -64,7 +63,6 @@ const iconPaths = {
   home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5M9.5 20v-6h5v6"/>',
   people: '<path d="M16 21v-1.8a4.2 4.2 0 0 0-4.2-4.2H5.2A4.2 4.2 0 0 0 1 19.2V21"/><circle cx="8.5" cy="7" r="4"/><path d="M18 8v6M21 11h-6"/>',
   network: '<circle cx="6" cy="7" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="m8.3 8 2.7 7.5M15.7 8l-2.6 7.5M8.5 7.1l7-.7"/>',
-  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
   database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -201,7 +199,7 @@ function setSyncStatus(status, label = "") {
   syncStatus = status;
   if (!syncChip || !syncLabel) return;
   syncChip.dataset.status = status;
-  syncLabel.textContent = label || (status === "synced" ? "SINCRONIZADO" : status === "syncing" ? "GUARDANDO…" : status === "error" ? "ERROR SYNC" : "LOCAL");
+  syncLabel.textContent = label || (status === "synced" ? "SINCRONIZADO" : status === "syncing" ? "GUARDANDO…" : status === "error" ? "ERROR SYNC" : "EN ESTE DISPOSITIVO");
 }
 
 function saveStore(message = "Guardado", { sync = true } = {}) {
@@ -235,7 +233,7 @@ function scheduleCloudSync() {
       if (error instanceof CloudConflictError) return handleCloudConflict(error);
       console.error("ORBITA cloud sync", error);
       setSyncStatus("error");
-      toast("Tus cambios quedaron guardados localmente, pero no pude sincronizar la nube.", "warn");
+      toast("Tus cambios quedaron guardados en este dispositivo, pero no pude sincronizarlos.", "warn");
     }
   }, 700);
 }
@@ -243,7 +241,7 @@ function scheduleCloudSync() {
 async function syncNow({ quiet = false } = {}) {
   if (authSession?.mode !== "cloud" || !authSession.user?.id) {
     setSyncStatus("local");
-    if (!quiet) toast("Este espacio está en modo local.");
+    if (!quiet) toast("Tus datos están guardados en este dispositivo.");
     return false;
   }
   try {
@@ -258,7 +256,7 @@ async function syncNow({ quiet = false } = {}) {
     if (error instanceof CloudConflictError) { handleCloudConflict(error, { quiet }); return false; }
     console.error(error);
     setSyncStatus("error");
-    if (!quiet) toast("No pude sincronizar. Tus datos locales siguen a salvo.", "warn");
+    if (!quiet) toast("No pude sincronizar. Tus datos de este dispositivo siguen a salvo.", "warn");
     return false;
   }
 }
@@ -307,11 +305,11 @@ function renderCurrentRoute() {
   document.querySelector("#profile-name").textContent = store.profile.name || "Mi espacio";
   document.querySelector("#profile-role").textContent = store.profile.role || "Founder";
   document.querySelectorAll("[data-route]").forEach(btn => { const active=btn.dataset.route===route; btn.classList.toggle("active",active); if(active) btn.setAttribute("aria-current","page"); else btn.removeAttribute("aria-current"); });
-  const renderer={today:todayView,people:peopleView,network:networkView,agenda:agendaView,data:dataView}[route];
+  const renderer={today:todayView,people:peopleView,network:networkView,data:dataView}[route];
   viewRoot.innerHTML=renderer(); hydrateIcons(viewRoot); viewRoot.focus({preventScroll:true}); closeMobileNav();
 }
 function updateSignalBadge() {
-  const count = computeSignals(store).length;
+  const count = computeSignals(store).filter(signal => signal.type !== "meeting").length;
   const badge = document.querySelector("#today-badge");
   badge.textContent = count ? String(Math.min(count, 99)) : "";
   badge.hidden = !count;
@@ -340,25 +338,30 @@ function relationalGoalPanel() {
   const goal = store.profile.currentGoal || "";
   const results = relationalGoalResults();
   const hasGoal = Boolean(goal.trim());
-  return `<section class="relational-agent card">
-    <div class="agent-head">
+  return `<section class="goal-intelligence" aria-labelledby="current-goal-title">
+    <div class="goal-intelligence-head">
       <div>
-        <span class="eyebrow">AGENTE RELACIONAL</span>
-        <h2>¿Qué necesitás conseguir ahora?</h2>
-        <p>ÓRBITA cruza tu objetivo con el contexto que ya existe en tu red. Cada resultado muestra evidencia y separa hechos de inferencias.</p>
+        <span class="eyebrow">OBJETIVO ACTUAL</span>
+        <h2 id="current-goal-title" class="current-goal-copy">${hasGoal ? esc(goal) : "Definí qué querés lograr ahora."}</h2>
+        <p>ORBITA cruza este objetivo con evidencia que ya registraste en tu red. Si no hay sustento suficiente, no recomienda nada.</p>
       </div>
-      <span class="agent-mode">LOCAL · EXPLICABLE</span>
+      <span class="agent-mode">EXPLICABLE</span>
     </div>
-    <form id="relational-goal-form" class="agent-form">
-      <input id="relational-goal-input" name="goal" value="${esc(goal)}" maxlength="280" autocomplete="off" placeholder="Ej: Estoy levantando una ronda pre-seed" aria-label="Objetivo actual" />
-      <button class="btn btn-acid" type="submit">${icon("spark",15)} Analizar mi red</button>
+    <form id="relational-goal-form" class="goal-form-v06">
+      <label for="relational-goal-input">CAMBIAR OBJETIVO</label>
+      <div class="goal-input-row">
+        <input id="relational-goal-input" name="goal" value="${esc(goal)}" maxlength="280" autocomplete="off" placeholder="Ej: Estoy levantando una ronda pre-seed" aria-label="Objetivo actual" />
+        <button class="btn btn-ghost goal-change" type="button" data-action="focus-goal">CAMBIAR</button>
+        <button class="btn btn-acid" type="submit">${icon("spark",15)} ANALIZAR MI RED</button>
+      </div>
     </form>
-    ${!hasGoal ? `<div class="agent-empty"><span>OBJETIVO → RED → EVIDENCIA → OPORTUNIDAD → ACCIÓN</span><p>Escribí un objetivo real. ÓRBITA no completa huecos con información externa.</p></div>` :
-      results.length ? `<div class="agent-results">
-        <div class="agent-results-head"><span>${results.length} OPORTUNIDAD${results.length===1?"":"ES"} CON EVIDENCIA</span><small>Ordenadas por relevancia</small></div>
-        <div class="agent-result-grid">${results.slice(0,3).map((result,index)=>relationalOpportunityCard(result,index)).join("")}</div>
+    ${!hasGoal ? `<div class="goal-first-run"><span>OBJETIVO → RED → EVIDENCIA → OPORTUNIDAD → ACCIÓN</span><p>Empezá con un objetivo concreto. ORBITA trabaja únicamente con el contexto guardado.</p></div>` :
+      results.length ? `<div class="ranked-opportunities">
+        <div class="ranked-opportunities-head"><div><span class="eyebrow">OPORTUNIDADES PARA TU OBJETIVO</span><strong>${results.length} relación${results.length===1?"":"es"} con evidencia suficiente</strong></div><small>Ordenadas por relevancia contextual</small></div>
+        <div class="opportunity-rank-list">${results.slice(0,3).map((result,index)=>relationalOpportunityCard(result,index)).join("")}</div>
+        <button class="text-btn opportunity-all" data-action="open-goal-network">VER LA RED POR OBJETIVO →</button>
       </div>` :
-      `<div class="agent-no-match"><strong>NO HAY EVIDENCIA SUFICIENTE</strong><p>Con los datos registrados no puedo sostener una recomendación para “${esc(goal)}”. Probá otro objetivo o agregá contexto real a tu red.</p></div>`
+      `<div class="agent-no-match"><strong>NO ENCONTRÉ EVIDENCIA SUFICIENTE</strong><p>Con los datos registrados no puedo sostener una recomendación para “${esc(goal)}”. Agregá contexto real o probá otro objetivo.</p></div>`
     }
   </section>`;
 }
@@ -366,175 +369,263 @@ function relationalGoalPanel() {
 function relationalOpportunityCard(result, index) {
   const person = personById(store, result.contact_id);
   if (!person) return "";
-  return `<button class="agent-result ${index===0?"primary":""}" data-action="agent-opportunity" data-id="${esc(person.id)}">
-    <div class="agent-rank">0${index+1}</div>
-    <div class="agent-result-main">
-      <span>${esc(person.role || person.company || "Relación")}</span>
-      <strong>${esc(person.name)}</strong>
+  return `<article class="opportunity-rank ${index===0?"primary":""}">
+    <div class="opportunity-rank-index"><span>RANK</span><strong>0${index+1}</strong></div>
+    <div class="opportunity-rank-main">
+      <span class="opportunity-person-meta">${esc(personMeta(person))}</span>
+      <h3>${esc(person.name)}</h3>
       <p>${esc(result.reason)}</p>
+      <div class="opportunity-proof"><span>${result.evidence.length} evidencia${result.evidence.length===1?"":"s"}</span><span>Confianza ${esc(result.confidence)}</span></div>
     </div>
-    <div class="agent-score"><strong>${result.relevance_score}</strong><span>RELEVANCIA</span></div>
-  </button>`;
+    <div class="opportunity-rank-score"><strong>${result.relevance_score}</strong><span>RELEVANCIA</span></div>
+    <div class="opportunity-rank-actions">
+      <button class="btn btn-acid" data-action="agent-opportunity" data-id="${esc(person.id)}">VER POR QUÉ</button>
+      <button class="btn btn-ghost" data-action="open-person" data-id="${esc(person.id)}">ABRIR RELACIÓN</button>
+    </div>
+  </article>`;
+}
+
+function attentionQueue() {
+  const signals = computeSignals(store).filter(signal => signal.type !== "meeting").slice(0, 6);
+  if (!signals.length) return `<div class="attention-empty"><strong>Tu red está al día.</strong><p>No hay señales urgentes. Registrá lo que pase para mantener contexto útil.</p><button class="text-btn" data-action="open-capture">CAPTURAR ALGO →</button></div>`;
+  return `<div class="attention-list">${signals.map(signal => {
+    const person = personById(store, signal.personId);
+    if (!person) return "";
+    const action = signal.type === "commitment"
+      ? `data-action="edit-commitment" data-id="${esc(signal.entityId)}"`
+      : `data-action="open-person" data-id="${esc(person.id)}"`;
+    const actionLabel = signal.type === "commitment" ? "RESOLVER" : "ABRIR";
+    return `<button class="attention-row ${signal.tone==="risk"?"risk":""}" ${action}>
+      <span class="attention-type">${esc(signal.title)}</span>
+      <span class="attention-person"><strong>${esc(person.name)}</strong><small>${esc(signal.body)}</small></span>
+      <span class="attention-when">${esc(signal.meta)}</span>
+      <span class="attention-action">${actionLabel} ${icon("arrow",14)}</span>
+    </button>`;
+  }).join("")}</div>`;
 }
 
 function todayView(){
-  const signals=computeSignals(store).slice(0,3),meetings=upcomingMeetings(store).slice(0,3),pulse=relationshipPulse();
-  const risky=store.people.filter(p=>["warn","risk"].includes(relationshipState(store,p).tone)).length;
   const contextualized=store.people.filter(p=>Boolean(p.relation||p.notes||(p.tags||[]).length)).length;
-  const openCommitments=store.commitments.filter(c=>c.status!=="done").length;
-  if(!store.people.length)return `${pageHead("01","HOY","Tu centro de mando relacional")}<section class="onboarding-card"><div class="onboarding-mark">${icon("network",30)}</div><h2>Construí tu primera órbita</h2><p>Agregá una persona y registrá una interacción real. ORBITA empieza a ordenar el contexto desde ahí.</p><button class="btn btn-acid" data-action="capture-kind" data-kind="person">${icon("plus")} Agregar primera persona</button></section>`;
-  return `${pageHead("01","HOY","Tu centro de mando relacional",`<span class="date-chip">${esc(new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date()).toUpperCase())}</span>`)}
-  ${relationalGoalPanel()}
-  <div class="today-layout">
-    <section class="pulse-card"><span class="pulse-label">TU PULSO RELACIONAL</span><strong class="pulse-number">${pulse}</strong><div class="pulse-foot"><span>EN CADENCIA</span><b>${risky} fuera de cadencia</b></div></section>
-    <section class="card movement-card"><div class="section-head"><span class="eyebrow">PRÓXIMOS MOVIMIENTOS</span><button class="text-btn" data-action="capture-kind" data-kind="meeting">+ Agendar</button></div><div class="movement-list">${meetings.length?meetings.map(m=>{const p=personById(store,m.personId);return `<div class="movement-row-shell"><button class="movement-row" data-action="brief-meeting" data-id="${esc(m.id)}"><div><strong>${esc(m.title)}</strong><span>${esc(formatDateTime(m.start))}${p?` · ${esc(p.name)}`:""}</span></div>${icon("arrow",15)}</button><button class="icon-btn inline-edit" data-action="edit-meeting" data-id="${esc(m.id)}" aria-label="Editar ${esc(m.title)}" title="Editar reunión">${icon("edit",14)}</button></div>`}).join(""):`<button class="movement-row" data-action="capture-kind" data-kind="meeting"><div><strong>Agendá tu próximo movimiento</strong><span>No hay reuniones próximas</span></div>${icon("arrow",15)}</button>`}</div></section>
-    <section class="signals-panel"><div class="signals-title"><strong>SEÑALES IMPORTANTES</strong><button class="text-btn" data-route="people">VER TODAS</button></div><div class="signal-cards">${signals.length?signals.map((s,i)=>signalCard(s,i)).join(""):`<button class="signal-card neon" data-action="capture-kind" data-kind="interaction"><small>Red en orden</small><strong>No hay señales urgentes. Registrá una interacción nueva.</strong><footer><span>Ahora</span>${icon("spark",17)}</footer></button>`}</div></section>
-    <section class="focus-strip"><div class="focus-block"><div><span>TU FOCO DE HOY</span><strong>${risky?`Reactivar ${risky} relación${risky===1?"":"es"}`:"Registrar una conversación valiosa"}</strong></div><button class="focus-arrow" data-route="people" aria-label="Abrir personas">${icon("arrow",18)}</button></div><div class="focus-block"><div><span>MEMORIA RELACIONAL</span><strong>${store.interactions.length} registros <small>en ${contextualized} relaciones con contexto</small></strong></div><span class="focus-fact">${openCommitments} compromisos abiertos</span></div></section>
-  </div>`;
+  if(!store.people.length)return `${pageHead("01","HOY","Inteligencia y acción sobre tu red")}<section class="onboarding-card v06-empty"><div class="onboarding-mark">${icon("network",30)}</div><span class="eyebrow">TU ÓRBITA ESTÁ VACÍA</span><h2>Agregá una relación para empezar a construir contexto.</h2><p>ORBITA necesita hechos registrados para poder detectar señales y oportunidades reales.</p><button class="btn btn-acid" data-action="capture-kind" data-kind="person">${icon("plus")} AGREGAR PRIMERA RELACIÓN</button></section>`;
+  return `${pageHead("01","HOY","Tu sistema operativo relacional",`<span class="date-chip">${esc(new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short",year:"numeric"}).format(new Date()).toUpperCase())}</span>`)}
+    ${relationalGoalPanel()}
+    <section class="attention-section">
+      <div class="section-head v06-section-head"><div><span class="eyebrow">NECESITA TU ATENCIÓN</span><h2>Qué merece movimiento ahora</h2></div><button class="text-btn" data-action="open-capture">CAPTURAR +</button></div>
+      ${attentionQueue()}
+    </section>
+    <section class="today-secondary single">
+      <div class="today-context">
+        <span class="eyebrow">MEMORIA RELACIONAL</span>
+        <strong>${contextualized}<small> / ${store.people.length} relaciones con contexto</small></strong>
+        <p>${store.interactions.length} interacciones registradas · ${store.commitments.filter(c=>c.status!=="done").length} compromisos abiertos.</p>
+      </div>
+    </section>`;
 }
-function signalCard(signal,index){const p=personById(store,signal.personId);if(!p)return"";const cls=signal.tone==="risk"?"orange":index===1?"blue":"neon";let action=`data-action="open-person" data-id="${esc(p.id)}"`;if(signal.type==="meeting")action=`data-action="brief-meeting" data-id="${esc(signal.entityId)}"`;if(signal.type==="commitment")action=`data-action="edit-commitment" data-id="${esc(signal.entityId)}"`;const ic=signal.type==="meeting"?"calendar":signal.type==="commitment"?"check":"spark";return `<button class="signal-card ${cls}" ${action}><small>${esc(signal.title)}</small><strong>${esc(p.name)} — ${esc(signal.body)}</strong><footer><span>${esc(signal.meta)}</span><span class="signal-action">${signal.type==="commitment"?"EDITAR":signal.type==="meeting"?"PREPARAR":"ABRIR"} ${icon(ic,16)}</span></footer></button>`}
 
-function peopleView(){const q=ui.peopleQuery.trim().toLowerCase();const people=store.people.filter(p=>ui.circleFilter==="Todos"||p.circle===ui.circleFilter).filter(p=>!q||[p.name,p.role,p.company,p.city,p.tags.join(" "),p.relation].join(" ").toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,"es"));return `${pageHead("02","PERSONAS","Conocé. Comprendé. Activá.")}<div class="people-toolbar"><label class="inline-search">${icon("search",17)}<input id="people-search" value="${esc(ui.peopleQuery)}" placeholder="Buscar personas, empresas, tags..." /></label><button class="btn btn-primary" data-action="capture-kind" data-kind="person">${icon("plus")} Nueva persona</button></div><div class="filter-chips">${["Todos","Cercano","Estratégico","Activo","Nuevo"].map(c=>`<button class="filter-chip ${ui.circleFilter===c?"active":""}" data-action="people-filter" data-value="${esc(c)}">${esc(c)}</button>`).join("")}<span class="result-count">${people.length} PERSONAS</span></div>${people.length?`<section class="people-list">${people.map(personRow).join("")}</section>`:emptyState("search","Sin resultados","Probá otro término o agregá una persona.",`<button class="btn btn-primary" data-action="capture-kind" data-kind="person">Agregar persona</button>`)}<button class="import-strip" data-action="import-csv">${icon("upload",24)}<div><strong>IMPORTAR CONTACTOS</strong><span>Desde CSV · todo se procesa y guarda localmente</span></div><div class="import-lines"></div></button>`}
-function personRow(p){const last=lastInteraction(store,p.id),rel=relationshipState(store,p),pending=openCommitmentsFor(store,p.id).length;return `<article class="person-row" data-action="open-person" data-id="${esc(p.id)}" tabindex="0"><div class="person-main">${avatar(p)}<div><strong>${esc(p.name)}</strong><span>${esc(personMeta(p))}</span></div></div><div class="person-cell-secondary"><span>ÚLTIMO CONTACTO</span><strong>${esc(last?formatRelative(last.date):"Sin historial")}</strong></div><div class="person-cell-secondary"><span>PEND.</span><strong>${pending}</strong></div><div>${circlePill(p.circle)}</div><div>${statePill(rel)}</div><div class="row-actions"><button class="icon-btn row-edit" data-action="edit-person" data-id="${esc(p.id)}" aria-label="Editar ${esc(p.name)}" title="Editar persona">${icon("edit",15)}</button><button class="icon-btn row-open" data-action="open-person" data-id="${esc(p.id)}" aria-label="Abrir ${esc(p.name)}" title="Abrir perfil">${icon("arrow",15)}</button></div></article>`}
+function peopleView(){
+  const q=ui.peopleQuery.trim().toLowerCase();
+  const people=store.people.filter(p=>ui.circleFilter==="Todos"||p.circle===ui.circleFilter).filter(p=>!q||[p.name,p.role,p.company,p.city,p.tags.join(" "),p.relation].join(" ").toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name,"es"));
+  return `${pageHead("02","PERSONAS","Relaciones con historia, no registros de CRM")}
+    <div class="people-toolbar v06-people-toolbar">
+      <label class="inline-search">${icon("search",17)}<input id="people-search" value="${esc(ui.peopleQuery)}" placeholder="Buscar personas, empresas o contexto…" /></label>
+      <button class="btn btn-primary" data-action="capture-kind" data-kind="person">${icon("plus")} NUEVA RELACIÓN</button>
+    </div>
+    <div class="filter-chips v06-filter-chips">${["Todos","Cercano","Estratégico","Activo","Nuevo"].map(c=>`<button class="filter-chip ${ui.circleFilter===c?"active":""}" data-action="people-filter" data-value="${esc(c)}">${esc(c)}</button>`).join("")}<span class="result-count">${people.length} RELACIONES</span></div>
+    ${people.length?`<section class="people-list v06-people-list">${people.map(personRow).join("")}</section>`:emptyState("search","Sin relaciones que coincidan","Probá otro término o agregá una relación.",`<button class="btn btn-primary" data-action="capture-kind" data-kind="person">Agregar relación</button>`)}
+    <button class="import-strip v06-import-strip" data-action="import-csv">${icon("upload",22)}<div><strong>IMPORTAR CONTACTOS</strong><span>CSV · después podés enriquecer cada relación con contexto real</span></div>${icon("arrow",15)}</button>`;
+}
 
-function networkView(){const people=store.people.filter(p=>ui.networkFilter==="Todos"||p.circle===ui.networkFilter);const circles=["Cercano","Estratégico","Activo","Nuevo"],radii={Cercano:18,"Estratégico":29,Activo:38,Nuevo:46},grouped=Object.fromEntries(circles.map(c=>[c,people.filter(p=>p.circle===c)]));const nodes=circles.flatMap(c=>grouped[c].map((p,i,a)=>{const angle=((Math.PI*2)/Math.max(a.length,1))*i-Math.PI/2+circles.indexOf(c)*.55,r=radii[c];return `<button class="network-node circle-node-${c.toLowerCase().replaceAll("é","e")}" style="left:${50+Math.cos(angle)*r}%;top:${50+Math.sin(angle)*r}%" data-action="open-person" data-id="${esc(p.id)}" aria-label="Abrir ${esc(p.name)}" title="${esc(p.name)} · ${esc(personMeta(p))}"><span class="node-avatar">${esc(initials(p.name))}</span></button>`})).join("");const tags=topTags(4),opps=store.opportunities.filter(o=>o.stage!=="Cerrada").length,strong=store.people.filter(p=>["Cercano","Estratégico"].includes(p.circle)).length,meetings=upcomingMeetings(store),next=meetings[0];return `${pageHead("03","RED","Visualizá el poder de tu red",`<button class="btn btn-ghost" data-action="cycle-network-filter">${icon("filter")} Filtro: ${esc(ui.networkFilter)}</button>`)}<div class="network-layout"><aside class="network-metrics"><div class="net-metric"><strong>${store.people.length}</strong><span>NODOS</span></div><div class="net-metric"><strong>${new Set(store.people.map(p=>p.company).filter(Boolean)).size}</strong><span>ORGANIZACIONES</span></div><div class="net-metric"><strong>${strong}</strong><span>RELACIONES<br/>CLAVE</span></div><div class="net-metric"><strong>${opps}</strong><span>OPORTUNIDADES</span></div><button class="net-opportunity" data-action="open-opportunities">VER OPORTUNIDADES ↗</button></aside><section class="card network-card"><div class="network-toolbar"><span>${people.length} personas visibles · tocá un nodo para abrir su relación</span></div><div class="orbit-map"><div class="network-center"><strong>TÚ</strong></div>${nodes}</div></section><aside class="network-aside"><section><span class="eyebrow">TEMA DOMINANTE</span><h3>${esc(tags[0]?.name||"Sin tema dominante")}</h3><p class="muted-copy">${tags[0]?.count||0} relaciones etiquetadas con este tema</p></section><section><span class="eyebrow">EN TU RED</span><div class="connected-avatars">${store.people.slice(0,5).map(p=>avatar(p,"avatar-xs")).join("")}</div></section><section><span class="eyebrow">TEMAS CLAVE</span><div class="topic-chips">${tags.map(t=>`<span class="topic-chip">${esc(t.name)}</span>`).join("")||`<span class="topic-chip">Sin tags</span>`}</div></section>${next?`<button class="network-event actionable" data-action="brief-meeting" data-id="${esc(next.id)}"><span class="eyebrow">PRÓXIMO EVENTO</span><strong>${esc(next.title)}</strong><span>${esc(formatDateTime(next.start))}</span><small>ABRIR BRIEF →</small></button>`:`<button class="network-event actionable" data-action="capture-kind" data-kind="meeting"><span class="eyebrow">PRÓXIMO EVENTO</span><strong>Sin evento próximo</strong><span>Agendá una reunión</span><small>AGENDAR →</small></button>`}</aside></div>`}
+function personRow(p){
+  const last=lastInteraction(store,p.id),rel=relationshipState(store,p),pending=openCommitmentsFor(store,p.id).length;
+  return `<button type="button" class="person-row v06-person-row" data-action="open-person" data-id="${esc(p.id)}" aria-label="Abrir relación con ${esc(p.name)}">
+    <div class="person-main">${avatar(p)}<div><strong>${esc(p.name)}</strong><span>${esc(personMeta(p))}</span></div></div>
+    <div class="person-cell-secondary"><span>ÚLTIMO CONTACTO</span><strong>${esc(last?formatRelative(last.date):"Sin historial")}</strong></div>
+    <div class="person-cell-secondary"><span>ESTADO</span>${statePill(rel)}</div>
+    <div class="person-relationship-meta">${circlePill(p.circle)}${pending?`<span class="pending-count">${pending} pendiente${pending===1?"":"s"}</span>`:""}</div>
+    <span class="row-open">${icon("arrow",16)}</span>
+  </button>`;
+}
 
-function agendaDate(value=ui.agendaAnchor){const d=new Date(`${value}T12:00:00`);return Number.isNaN(d.getTime())?new Date():d}
-function dateKey(date){const d=new Date(date.getTime()-date.getTimezoneOffset()*60000);return d.toISOString().slice(0,10)}
-function weekStart(date=agendaDate()){const d=new Date(date),day=(d.getDay()+6)%7;d.setDate(d.getDate()-day);d.setHours(12,0,0,0);return d}
-function isSameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate()}
-function meetingRow(m){const p=personById(store,m.personId);return `<article class="agenda-event-row ${m.status==="done"?"done":""}"><button class="agenda-event-main" data-action="brief-meeting" data-id="${esc(m.id)}"><div class="agenda-date"><strong>${new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit"}).format(new Date(m.start))}</strong><span>${esc(formatDate(m.start))}</span></div><div class="agenda-main"><strong>${esc(m.title)}</strong><span>${esc(p?.name||"Sin persona")} · ${m.durationMin} min · ${m.status==="done"?"Realizada":"Próxima"}</span></div></button><button class="icon-btn" data-action="edit-meeting" data-id="${esc(m.id)}" aria-label="Editar reunión" title="Editar reunión">${icon("edit",15)}</button></article>`}
-function calendarWeekView(){const start=weekStart(),days=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(d.getDate()+i);return d}),hours=Array.from({length:10},(_,i)=>8+i);return `<div class="calendar-week"><div class="time-col"><div class="time-head"></div>${hours.map(h=>`<div class="time-label">${String(h).padStart(2,"0")}:00</div>`).join("")}</div>${days.map(day=>{const events=store.meetings.filter(m=>isSameDay(new Date(m.start),day));return `<div class="day-col"><button class="day-head ${isSameDay(day,new Date())?"today":""}" data-action="agenda-select-date" data-value="${dateKey(day)}"><span>${new Intl.DateTimeFormat("es-AR",{weekday:"short"}).format(day).toUpperCase()}</span><strong>${day.getDate()}</strong></button><div class="time-grid"></div>${events.map((m,i)=>{const d=new Date(m.start),top=50+Math.max(0,(d.getHours()+d.getMinutes()/60-8))*38,tone=i%3===1?"blue":i%3===2?"dark":"";return `<button class="cal-event ${tone} ${m.status==="done"?"done":""}" style="top:${top}px" data-action="brief-meeting" data-id="${esc(m.id)}" title="${esc(m.title)}"><strong>${esc(m.title)}</strong><span>${esc(personById(store,m.personId)?.name||"")}</span></button>`}).join("")}</div>`}).join("")}</div>`}
-function calendarDayView(){const selected=agendaDate(),events=store.meetings.filter(m=>isSameDay(new Date(m.start),selected)).sort((a,b)=>new Date(a.start)-new Date(b.start));return `<div class="day-agenda"><div class="selected-day-head"><span>${new Intl.DateTimeFormat("es-AR",{weekday:"long",day:"numeric",month:"long"}).format(selected)}</span><button class="text-btn" data-action="capture-kind" data-kind="meeting">+ Nueva reunión</button></div>${events.length?events.map(meetingRow).join(""):emptyState("calendar","Sin reuniones este día","Podés agendar una reunión o elegir otra fecha.",`<button class="btn btn-acid" data-action="capture-kind" data-kind="meeting">Nueva reunión</button>`)}</div>`}
-function calendarMonthView(){const now=agendaDate(),first=new Date(now.getFullYear(),now.getMonth(),1,12),offset=(first.getDay()+6)%7,start=new Date(first);start.setDate(first.getDate()-offset);const days=Array.from({length:42},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d});return `<div class="month-grid">${days.map(d=>{const events=store.meetings.filter(m=>isSameDay(new Date(m.start),d));return `<button class="month-day ${isSameDay(d,new Date())?"today":""} ${d.getMonth()!==now.getMonth()?"outside":""}" data-action="agenda-select-date" data-value="${dateKey(d)}"><strong>${d.getDate()}</strong>${events.length?`<div class="month-event-dot" title="${events.length} evento(s)"></div><span>${events.length} evento${events.length===1?"":"s"}</span>`:""}</button>`}).join("")}</div>`}
-function agendaRangeLabel(){const d=agendaDate();if(ui.agendaMode==="day")return new Intl.DateTimeFormat("es-AR",{day:"numeric",month:"long",year:"numeric"}).format(d);if(ui.agendaMode==="month")return new Intl.DateTimeFormat("es-AR",{month:"long",year:"numeric"}).format(d);const start=weekStart(d),end=new Date(start);end.setDate(end.getDate()+6);return `${new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(start)} — ${new Intl.DateTimeFormat("es-AR",{day:"2-digit",month:"short"}).format(end)}`}
-function agendaView(){const meetings=upcomingMeetings(store),next=meetings[0],person=next?personById(store,next.personId):null,commitments=store.commitments.filter(c=>c.status!=="done").sort((a,b)=>(a.dueDate||"9999").localeCompare(b.dueDate||"9999")),today=agendaDate(),content=ui.agendaMode==="day"?calendarDayView():ui.agendaMode==="month"?calendarMonthView():calendarWeekView();return `${pageHead("04","AGENDA","Tu tiempo, tu ventaja competitiva",`<button class="btn btn-primary" data-action="capture-kind" data-kind="meeting">${icon("plus")} Nuevo evento</button>`)}<div class="agenda-shell"><aside class="agenda-left"><div class="date-tile"><span>${new Intl.DateTimeFormat("es-AR",{month:"long",year:"numeric"}).format(today).toUpperCase()}</span><strong>${today.getDate()}</strong><b>${new Intl.DateTimeFormat("es-AR",{weekday:"long"}).format(today)}</b></div><div class="next-meeting-card"><span class="eyebrow">PRÓXIMA REUNIÓN</span>${next?`<div class="time">${new Intl.DateTimeFormat("es-AR",{hour:"2-digit",minute:"2-digit"}).format(new Date(next.start))}</div><strong>${esc(person?.name||next.title)}</strong><span>${esc(next.title)}</span><div class="split-actions"><button class="btn" data-action="brief-meeting" data-id="${esc(next.id)}">PREPARAR ${icon("arrow",13)}</button><button class="icon-btn" data-action="edit-meeting" data-id="${esc(next.id)}" title="Editar">${icon("edit",14)}</button></div>`:`<strong class="empty-title">Agenda libre</strong><button class="btn" data-action="capture-kind" data-kind="meeting">AGENDAR ${icon("plus",13)}</button>`}</div><div class="agenda-pending"><div class="section-head"><span class="eyebrow">PENDIENTES</span><button class="text-btn" data-action="capture-kind" data-kind="commitment">+ Nuevo</button></div>${commitments.slice(0,3).map(c=>{const p=personById(store,c.personId);return `<button class="pending-mini" data-action="edit-commitment" data-id="${esc(c.id)}"><strong>${esc(c.title)}</strong><span>${esc(p?.name||"")}${c.dueDate?` · ${esc(formatDate(c.dueDate))}`:""}</span></button>`}).join("")||`<p class="muted-copy">Sin pendientes.</p>`}</div></aside><section class="calendar-card"><div class="calendar-toolbar"><div class="calendar-nav"><button class="icon-btn" data-action="agenda-nav" data-value="-1" aria-label="Anterior">←</button><button class="text-btn calendar-range" data-action="agenda-today">${esc(agendaRangeLabel())}</button><button class="icon-btn" data-action="agenda-nav" data-value="1" aria-label="Siguiente">→</button></div><div class="view-switch">${[["day","DÍA"],["week","SEMANA"],["month","MES"]].map(([m,l])=>`<button class="${ui.agendaMode===m?"active":""}" data-action="agenda-mode" data-value="${m}">${l}</button>`).join("")}</div></div>${content}</section><aside class="agenda-right"><section class="agenda-prepare"><span class="eyebrow">PREPÁRATE</span>${person?`<div class="profile-line">${avatar(person)}<div><strong>${esc(person.name)}</strong><span>${esc(personMeta(person))}</span></div></div><span class="eyebrow">TEMAS SUGERIDOS</span><ul class="prepare-list"><li>${esc(person.tags?.[0]||"Contexto actual")}</li><li>${esc(openCommitmentsFor(store,person.id)[0]?.title||"Próximo paso")}</li><li>${esc(opportunitiesFor(store,person.id)[0]?.title||"Actualizar relación")}</li></ul><div class="prepare-docs"><span>ÚLTIMO CONTACTO</span><span>${esc(lastInteraction(store,person.id)?formatRelative(lastInteraction(store,person.id).date):"Sin historial")}</span></div><button class="btn" data-action="open-person" data-id="${esc(person.id)}">VER PERFIL ${icon("arrow",13)}</button>`:`<p class="muted-copy">Cuando tengas una reunión próxima, ORBITA concentra acá el contexto de esa persona.</p>`}</section><section class="protected-time"><span class="eyebrow">CONTEXTO DE AGENDA</span><strong>${meetings.length}</strong><span class="muted-copy">reuniones próximas</span><div class="bar-chart">${[9,15,12,25,32].map(h=>`<i style="height:${h}px"></i>`).join("")}</div></section></aside></div>`}
+function networkView(){
+  const goal=store.profile.currentGoal||"";
+  const hasGoal=Boolean(goal.trim());
+  const goalMode=ui.networkMode==="goal";
+
+  if(goalMode&&!hasGoal){
+    return `${pageHead("03","RED","Leé tu red desde lo que querés lograr")}
+      <section class="network-goal-empty">
+        <span class="eyebrow">RED PARA TU OBJETIVO</span>
+        <h2>Definí un objetivo para leer tu red.</h2>
+        <p>ORBITA necesita saber qué querés lograr para determinar qué relaciones son relevantes ahora.</p>
+        <div class="network-empty-actions">
+          <button class="btn btn-acid" data-action="define-goal">DEFINIR OBJETIVO</button>
+          <button class="btn btn-ghost" data-action="network-mode" data-value="all">VER RED COMPLETA</button>
+        </div>
+      </section>`;
+  }
+
+  const people=store.people.filter(p=>ui.networkFilter==="Todos"||p.circle===ui.networkFilter);
+  const circles=["Cercano","Estratégico","Activo","Nuevo"];
+  const radii={Cercano:18,"Estratégico":29,Activo:39,Nuevo:47};
+  const grouped=Object.fromEntries(circles.map(c=>[c,people.filter(p=>p.circle===c)]));
+  const ranked=goalMode&&hasGoal?buildRelationalOpportunities(store,goal):[];
+  const rankMap=new Map(ranked.map((item,index)=>[item.contact_id,{...item,rank:index+1}]));
+  const nodes=circles.flatMap(c=>grouped[c].map((p,i,a)=>{
+    const angle=((Math.PI*2)/Math.max(a.length,1))*i-Math.PI/2+circles.indexOf(c)*.55;
+    const r=radii[c],match=rankMap.get(p.id);
+    const relevanceClass=goalMode?(match?"goal-relevant":"goal-muted"):"";
+    const rankLabel=match?` · #${match.rank} para tu objetivo`:"";
+    return `<button class="network-node circle-node-${c.toLowerCase().replaceAll("é","e")} ${relevanceClass}" style="left:${50+Math.cos(angle)*r}%;top:${50+Math.sin(angle)*r}%" data-action="open-person" data-id="${esc(p.id)}" aria-label="Abrir ${esc(p.name)}" title="${esc(p.name)} · ${esc(personMeta(p))}${esc(rankLabel)}"><span class="node-avatar">${esc(initials(p.name))}</span>${match?`<b class="node-rank">0${match.rank}</b>`:""}</button>`;
+  })).join("");
+  const tags=topTags(4);
+  const visibleSignals=computeSignals(store).filter(signal=>signal.type!=="meeting").length;
+
+  return `${pageHead("03","RED",goalMode?"Red para tu objetivo":"Vista completa de tus relaciones")}
+    <section class="network-command goal-first-command">
+      <div class="network-goal-context">
+        <span>${goalMode?"RED PARA TU OBJETIVO":"RED COMPLETA"}</span>
+        <strong>${goalMode?esc(goal):`${store.people.length} relaciones registradas`}</strong>
+        ${goalMode?`<small>${store.people.length} relaciones analizadas · ${ranked.length} con evidencia relevante</small>`:""}
+      </div>
+      <div class="network-secondary-actions">
+        ${goalMode?`<button class="btn btn-ghost" data-action="network-mode" data-value="all">VER RED COMPLETA</button>`:`<button class="btn btn-acid" data-action="network-mode" data-value="goal" ${!hasGoal?"disabled":""}>VOLVER A RED POR OBJETIVO</button>`}
+        <button class="btn btn-ghost" data-action="cycle-network-filter">${icon("filter")} ${esc(ui.networkFilter)}</button>
+      </div>
+    </section>
+    <div class="network-v06-layout">
+      <section class="network-stage">
+        <div class="orbit-map v06-orbit-map">
+          <i class="orbit-ring ring-1"></i><i class="orbit-ring ring-2"></i><i class="orbit-ring ring-3"></i><i class="orbit-ring ring-4"></i>
+          <div class="network-center"><strong>TÚ</strong><span>${esc(store.profile.role||"Founder")}</span></div>${nodes}
+        </div>
+        <div class="network-legend">${circles.map(c=>`<span class="legend-${c.toLowerCase().replaceAll("é","e")}"><i></i>${esc(c)}</span>`).join("")}</div>
+      </section>
+      <aside class="network-intelligence">
+        <div><span class="eyebrow">${goalMode?"RELEVANCIA CONTEXTUAL":"LECTURA DE RED"}</span><h2>${goalMode?"Relaciones relevantes para lo que querés lograr":`${store.people.length} relaciones registradas`}</h2></div>
+        ${goalMode ? (ranked.length?`<div class="network-ranked-mini">${ranked.slice(0,5).map((item,index)=>{const p=personById(store,item.contact_id);return p?`<button data-action="agent-opportunity" data-id="${esc(p.id)}"><span>0${index+1}</span><div><strong>${esc(p.name)}</strong><small>${esc(item.reason)}</small></div><b>${item.relevance_score}</b></button>`:""}).join("")}</div>`:`<p class="muted-copy">No hay relaciones con evidencia suficiente para este objetivo.</p>`) :
+        `<div class="network-readout"><div><strong>${new Set(store.people.map(p=>p.company).filter(Boolean)).size}</strong><span>organizaciones</span></div><div><strong>${store.people.filter(p=>["Cercano","Estratégico"].includes(p.circle)).length}</strong><span>relaciones cercanas / estratégicas</span></div><div><strong>${visibleSignals}</strong><span>señales activas</span></div></div><div class="topics-block"><span class="eyebrow">TEMAS PRESENTES</span><div class="topic-chips">${tags.map(t=>`<span class="topic-chip">${esc(t.name)} · ${t.count}</span>`).join("")||`<span class="muted-copy">Todavía no hay tags.</span>`}</div></div>`}
+        <p class="network-trust-note">La prominencia visual representa contexto y relevancia para una tarea; no el valor de una persona.</p>
+      </aside>
+    </div>`;
+}
 
 function activityRows(limit=5){return [...store.interactions].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,limit).map(i=>{const p=personById(store,i.personId);return `<article class="recent-row"><button class="recent-main" data-action="edit-interaction" data-id="${esc(i.id)}"><span class="soft-icon">${icon("note",13)}</span><span><strong>${esc(i.title)}</strong><span>${esc(p?.name||"")} · ${esc(formatRelative(i.date))}</span></span><span class="activity-type">${esc(i.type)}</span></button><button class="icon-btn" data-action="open-person" data-id="${esc(i.personId)}" aria-label="Abrir persona" title="Abrir relación">${icon("arrow",14)}</button></article>`}).join("")}
-function dataSummary(){const counts=Object.fromEntries(["Cercano","Estratégico","Activo","Nuevo"].map(c=>[c,store.people.filter(p=>p.circle===c).length])),total=Math.max(store.people.length,1),recent=store.people.filter(p=>Date.now()-new Date(p.createdAt)<30*864e5).length,openCommitments=store.commitments.filter(c=>c.status!=="done").length;return `<div class="metric-grid"><div class="metric-card blue"><small>PERSONAS EN TU RED</small><strong>${store.people.length}</strong><span>contexto registrado</span></div><div class="metric-card paper"><small>NUEVAS ESTE MES</small><strong>${recent}</strong><span>altas registradas</span></div><div class="metric-card acid"><small>INTERACCIONES ESTA SEMANA</small><strong>${interactionsThisWeek()}</strong><span>actividad registrada</span></div><div class="metric-card"><small>COMPROMISOS ABIERTOS</small><strong>${openCommitments}</strong><span>pendientes reales</span></div></div><div class="data-bottom"><section class="data-panel"><span class="eyebrow">ACTIVIDAD RECIENTE</span>${activityRows(5)||`<p class="muted-copy">Sin actividad.</p>`}</section><section class="data-panel"><span class="eyebrow">DISTRIBUCIÓN DE TU RED</span><div class="dist-wrap"><div class="donut-holder"><div class="donut" style="${donutBackground(counts)}"></div><div class="donut-center"><strong>${store.people.length}</strong><span>NODOS</span></div></div><div class="dist-legend">${[["#2747ff","Estratégicas",counts.Estratégico],["#dcff00","Cercanas",counts.Cercano],["#62b36d","Activas",counts.Activo],["#6d685f","Nuevas",counts.Nuevo]].map(([c,n,v])=>`<div><i style="background:${c}"></i><span>${n}</span><strong>${Math.round(v/total*100)}%</strong></div>`).join("")}</div></div></section><section class="data-panel"><span class="eyebrow">INSIGHTS CLAVE</span><div class="insight-list"><div class="insight">${icon("link",15)}<div><strong>${store.people.filter(p=>relationshipState(store,p).tone==="good").length} relaciones están al día</strong><span>Según la cadencia que definiste.</span></div></div><div class="insight">${icon("clock",15)}<div><strong>${computeSignals(store).length} señales requieren atención</strong><span>Calculadas desde fechas y pendientes reales.</span></div></div><div class="insight">${icon("people",15)}<div><strong>${topTags(1)[0]?.name||"Sin tema dominante"}</strong><span>Es el tag más repetido en tu red.</span></div></div></div></section></div>`}
-function dataRelations(){return `<section class="data-panel"><div class="section-head"><div><span class="eyebrow">RELACIONES</span><h2>Estado de tu red</h2></div><button class="btn btn-small" data-route="people">Abrir personas</button></div><div class="people-list" style="margin-top:10px">${store.people.map(personRow).join("")||`<p class="muted-copy" style="padding:12px">Sin personas.</p>`}</div></section>`}
-function dataConnections(){const tags=topTags(8),opps=store.opportunities.filter(o=>o.stage!=="Cerrada").sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)),counts=Object.fromEntries(["Cercano","Estratégico","Activo","Nuevo"].map(c=>[c,store.people.filter(p=>p.circle===c).length]));return `<div class="data-bottom two-col"><section class="data-panel"><span class="eyebrow">CONEXIONES</span><h2>Mapa por intención</h2><p class="muted-copy">La red se organiza por círculos definidos por vos; ORBITA no puntúa el valor humano.</p><div class="dist-wrap"><div class="donut-holder"><div class="donut" style="${donutBackground(counts)}"></div><div class="donut-center"><strong>${store.people.length}</strong><span>NODOS</span></div></div><div class="dist-legend">${["Cercano","Estratégico","Activo","Nuevo"].map((c,i)=>`<div><i style="background:${["#dcff00","#2747ff","#62b36d","#6d685f"][i]}"></i><span>${c}</span><strong>${store.people.filter(p=>p.circle===c).length}</strong></div>`).join("")}</div></div><button class="btn btn-small" data-route="network">Abrir mapa de red</button></section><section class="data-panel"><div class="section-head"><div><span class="eyebrow">OPORTUNIDADES</span><h2>Posibilidades abiertas</h2></div><button class="text-btn" data-action="capture-kind" data-kind="opportunity">+ Nueva</button></div><div class="opportunity-list compact">${opps.map(o=>{const p=personById(store,o.personId);return `<button data-action="edit-opportunity" data-id="${esc(o.id)}"><div><strong>${esc(o.title)}</strong><span>${esc(p?.name||"")} · ${esc(o.notes||"Sin notas")}</span></div><span class="stage-pill">${esc(o.stage)}</span></button>`}).join("")||`<p class="muted-copy">Todavía no registraste oportunidades.</p>`}</div><div class="topics-block"><span class="eyebrow">TEMAS DE LA RED</span><div class="topic-chips">${tags.map(t=>`<span class="topic-chip">${esc(t.name)} · ${t.count}</span>`).join("")||`<span class="muted-copy">Todavía no hay tags.</span>`}</div></div></section></div>`}
-function dataActivity(){return `<section class="data-panel"><div class="section-head"><div><span class="eyebrow">ACTIVIDAD</span><h2>Historial manual</h2></div><button class="btn btn-small" data-action="capture-kind" data-kind="interaction">Registrar</button></div><div style="margin-top:10px">${activityRows(20)||`<p class="muted-copy">Sin actividad registrada.</p>`}</div></section>`}
+function dataSummary(){const counts=Object.fromEntries(["Cercano","Estratégico","Activo","Nuevo"].map(c=>[c,store.people.filter(p=>p.circle===c).length])),total=Math.max(store.people.length,1),recent=store.people.filter(p=>Date.now()-new Date(p.createdAt)<30*864e5).length,openCommitments=store.commitments.filter(c=>c.status!=="done").length;return `<div class="metric-grid"><div class="metric-card blue"><small>PERSONAS EN TU RED</small><strong>${store.people.length}</strong><span>contexto registrado</span></div><div class="metric-card paper"><small>NUEVAS ESTE MES</small><strong>${recent}</strong><span>altas registradas</span></div><div class="metric-card acid"><small>INTERACCIONES ESTA SEMANA</small><strong>${interactionsThisWeek()}</strong><span>actividad registrada</span></div><div class="metric-card"><small>COMPROMISOS ABIERTOS</small><strong>${openCommitments}</strong><span>pendientes reales</span></div></div><div class="data-bottom"><section class="data-panel"><span class="eyebrow">ACTIVIDAD RECIENTE</span>${activityRows(5)||`<p class="muted-copy">Sin actividad.</p>`}</section><section class="data-panel"><span class="eyebrow">DISTRIBUCIÓN DE TU RED</span><div class="dist-wrap"><div class="donut-holder"><div class="donut" style="${donutBackground(counts)}"></div><div class="donut-center"><strong>${store.people.length}</strong><span>NODOS</span></div></div><div class="dist-legend">${[["#2747ff","Estratégicas",counts.Estratégico],["#dcff00","Cercanas",counts.Cercano],["#62b36d","Activas",counts.Activo],["#6d685f","Nuevas",counts.Nuevo]].map(([c,n,v])=>`<div><i style="background:${c}"></i><span>${n}</span><strong>${Math.round(v/total*100)}%</strong></div>`).join("")}</div></div></section><section class="data-panel"><span class="eyebrow">INSIGHTS CLAVE</span><div class="insight-list"><div class="insight">${icon("link",15)}<div><strong>${store.people.filter(p=>relationshipState(store,p).tone==="good").length} relaciones están al día</strong><span>Según la cadencia que definiste.</span></div></div><div class="insight">${icon("clock",15)}<div><strong>${computeSignals(store).filter(signal=>signal.type!=="meeting").length} señales requieren atención</strong><span>Calculadas desde fechas y pendientes reales.</span></div></div><div class="insight">${icon("people",15)}<div><strong>${topTags(1)[0]?.name||"Sin tema dominante"}</strong><span>Es el tag más repetido en tu red.</span></div></div></div></section></div>`}
 function dataFiles(){return `<div class="data-bottom" style="grid-template-columns:1fr 1fr"><section class="data-panel"><span class="eyebrow">EXPORTAR</span><h2>Descargar información</h2><div class="export-list"><button data-action="export-json"><span class="export-icon">${icon("download")}</span><div><strong>Backup completo</strong><span>JSON reimportable</span></div>${icon("arrow",14)}</button><button data-action="export-csv"><span class="export-icon">${icon("download")}</span><div><strong>Personas</strong><span>CSV para Excel / Sheets</span></div>${icon("arrow",14)}</button><button data-action="export-report"><span class="export-icon">${icon("download")}</span><div><strong>Informe de red</strong><span>Markdown de lectura humana</span></div>${icon("arrow",14)}</button></div></section><section class="data-panel"><span class="eyebrow">IMPORTAR</span><h2>Traer información</h2><div class="export-list"><button data-action="import-json"><span class="export-icon">${icon("upload")}</span><div><strong>Backup ORBITA</strong><span>Reemplaza el estado actual tras confirmar</span></div>${icon("arrow",14)}</button><button data-action="import-csv"><span class="export-icon">${icon("upload")}</span><div><strong>Contactos CSV</strong><span>Agrega personas a tu red</span></div>${icon("arrow",14)}</button></div></section></div>`}
-function dataSettings(){const audit=auditStore(store),bytes=audit.sizeBytes,email=authSession?.user?.email||"—",cloud=authSession?.mode==="cloud";return `<div class="settings-stack"><div class="data-bottom" style="grid-template-columns:1fr 1fr"><section class="data-panel"><div class="section-head"><div><span class="eyebrow">PERFIL</span><h2>Tu espacio</h2></div><button class="text-btn" data-action="edit-profile">Editar</button></div><dl class="profile-dl"><div><dt>Nombre</dt><dd>${esc(store.profile.name)}</dd></div><div><dt>Rol</dt><dd>${esc(store.profile.role)}</dd></div><div><dt>Foco</dt><dd>${esc(store.profile.focus)}</dd></div><div><dt>Almacenamiento</dt><dd>${(bytes/1024).toFixed(1)} KB</dd></div></dl></section><section class="data-panel account-panel"><div class="section-head"><div><span class="eyebrow">CUENTA Y SEGURIDAD</span><h2>${cloud?"Cuenta cloud":"Modo local"}</h2></div><span class="account-state ${cloud?"cloud":"local"}">${cloud?icon("cloud",14):icon("database",14)} ${cloud?"SYNC ACTIVO":"SOLO NAVEGADOR"}</span></div><dl class="profile-dl"><div><dt>Email</dt><dd>${esc(email)}</dd></div><div><dt>Sesión</dt><dd>${cloud?"Supabase Auth":"Desarrollo local"}</dd></div><div><dt>Estado</dt><dd>${esc(syncStatus)}</dd></div></dl><div class="account-actions">${cloud?`<button class="btn btn-primary" data-action="sync-now">${icon("cloud")} Sincronizar ahora</button>`:""}<button class="btn btn-ghost" data-action="start-onboarding">Repetir onboarding</button><button class="btn btn-ghost" data-action="sign-out">${icon("logout")} Salir</button></div></section></div><div class="data-bottom" style="grid-template-columns:1fr 1fr"><section class="data-panel audit-preview"><div class="section-head"><div><span class="eyebrow">SALUD DEL WORKSPACE</span><h2>${audit.ok?"Todo consistente":"Requiere atención"}</h2></div><span class="audit-badge ${audit.ok?"good":"risk"}">${audit.errors} ERR · ${audit.warnings} AVISOS</span></div><p class="muted-copy">Revisa referencias huérfanas, IDs, fechas y tamaño del workspace.</p><button class="btn btn-ghost" data-action="open-audit">${icon("shield")} Ejecutar auditoría</button></section><section class="danger-card"><span class="eyebrow">MANTENIMIENTO</span><h2>Reiniciar datos</h2><p class="muted-copy">Hacé un backup antes. Estas acciones reemplazan el estado guardado y, si usás cloud, se sincronizan.</p><div class="danger-actions"><button class="btn btn-ghost" data-action="reset-demo">${icon("refresh")} Restaurar demo</button><button class="btn btn-danger" data-action="erase-all">${icon("trash")} Empezar vacío</button>${cloud?`<button class="btn btn-danger" data-action="delete-account">${icon("shield")} Eliminar cuenta cloud</button>`:""}</div></section></div></div>`}
-function dataView(){const tab=ui.dataTab,content=tab==="summary"?dataSummary():tab==="relations"?dataRelations():tab==="connections"?dataConnections():tab==="activity"?dataActivity():tab==="files"?dataFiles():dataSettings();return `${pageHead("05","DATOS","Información que impulsa decisiones",`<button class="btn btn-primary" data-action="export-report">${icon("download")} Exportar informe</button>`)}<div class="data-layout"><aside class="data-nav">${[["summary","database","Resumen"],["relations","people","Relaciones"],["connections","network","Conexiones"],["activity","note","Actividad"],["files","archive","Archivos"],["settings","refresh","Configuración"]].map(([id,ic,label])=>`<button class="${tab===id?"active":""}" data-action="data-tab" data-value="${id}">${icon(ic,14)} ${label}</button>`).join("")}</aside><section class="data-content">${content}</section></div>`}
+function dataInfo(){
+  return `<div class="data-v06-stack"><section class="data-intro"><span class="eyebrow">MI INFORMACIÓN</span><h2>Tu red es portable y sigue bajo tu control.</h2><p>Importá, exportá y respaldá tu workspace sin mezclar herramientas técnicas con el uso diario.</p></section>${dataFiles()}</div>`;
+}
+
+function dataSystem(){
+  const audit=auditStore(store);
+  return `<div class="data-v06-stack"><section class="data-panel v06-system-health"><div class="section-head"><div><span class="eyebrow">SISTEMA</span><h2>${audit.ok?"Workspace consistente":"Hay datos para revisar"}</h2></div><span class="audit-badge ${audit.ok?"good":"risk"}">${audit.errors} ERR · ${audit.warnings} AVISOS</span></div><p class="muted-copy">ORBITA revisa referencias, IDs y fechas sin inventar ni completar información.</p><div class="system-actions"><button class="btn btn-primary" data-action="open-audit">${icon("shield")} ABRIR AUDITORÍA</button><button class="btn btn-ghost" data-action="reset-demo">${icon("refresh")} RESTAURAR DEMO</button></div></section><section class="data-panel"><div class="section-head"><div><span class="eyebrow">ACTIVIDAD</span><h2>Registros recientes</h2></div><button class="text-btn" data-action="capture-kind" data-kind="interaction">REGISTRAR +</button></div>${activityRows(12)||`<p class="muted-copy">Sin actividad registrada.</p>`}</section></div>`;
+}
+
+function dataAccount(){
+  const email=authSession?.user?.email||"—",cloud=authSession?.mode==="cloud";
+  return `<div class="data-v06-stack"><section class="data-panel account-panel v06-account-panel"><div class="section-head"><div><span class="eyebrow">CUENTA</span><h2>${esc(store.profile.name)}</h2><p class="muted-copy">${esc(store.profile.role)} · ${esc(store.profile.focus)}</p></div><span class="account-state ${cloud?"cloud":"local"}">${cloud?icon("cloud",14):icon("database",14)} ${cloud?"SYNC ACTIVO":"EN ESTE DISPOSITIVO"}</span></div><dl class="profile-dl"><div><dt>Email</dt><dd>${esc(email)}</dd></div><div><dt>Guardado</dt><dd>${cloud?"Cuenta conectada + copia en este dispositivo":"Datos en este dispositivo"}</dd></div><div><dt>Estado</dt><dd>${cloud?esc(syncStatus):"Disponible"}</dd></div></dl><div class="account-actions">${cloud?`<button class="btn btn-primary" data-action="sync-now">${icon("cloud")} SINCRONIZAR</button>`:""}<button class="btn btn-ghost" data-action="edit-profile">EDITAR PERFIL</button><button class="btn btn-ghost" data-action="sign-out">${icon("logout")} SALIR</button></div></section>${cloud?`<section class="danger-card"><span class="eyebrow">ZONA DE RIESGO</span><h2>Eliminar cuenta cloud</h2><p class="muted-copy">La eliminación requiere confirmación explícita y borra el workspace asociado.</p><button class="btn btn-danger" data-action="delete-account">${icon("shield")} ELIMINAR CUENTA</button></section>`:""}</div>`;
+}
+
+function dataAdvanced(){
+  return `<div class="data-v06-stack"><section class="data-intro"><span class="eyebrow">AVANZADO</span><h2>Lectura de workspace y herramientas secundarias.</h2><p>Esta sección concentra información que puede ser útil sin competir con la experiencia principal.</p></section>${dataSummary()}<section class="danger-card"><span class="eyebrow">MANTENIMIENTO</span><h2>Empezar con un workspace vacío</h2><p class="muted-copy">Hacé un backup antes. Esta acción reemplaza los datos actuales.</p><button class="btn btn-danger" data-action="erase-all">${icon("trash")} EMPEZAR VACÍO</button></section></div>`;
+}
+
+function dataView(){
+  const tab=["info","system","account","advanced"].includes(ui.dataTab)?ui.dataTab:"info";
+  const content=tab==="info"?dataInfo():tab==="system"?dataSystem():tab==="account"?dataAccount():dataAdvanced();
+  return `${pageHead("04","DATOS","Control, portabilidad y herramientas avanzadas")}<div class="data-layout v06-data-layout"><aside class="data-nav v06-data-nav">${[["info","archive","Mi información"],["system","shield","Sistema"],["account","person","Cuenta"],["advanced","database","Avanzado"]].map(([id,ic,label])=>`<button class="${tab===id?"active":""}" data-action="data-tab" data-value="${id}">${icon(ic,14)} ${label}</button>`).join("")}</aside><section class="data-content">${content}</section></div>`;
+}
+
+function relationshipTimeline(person){
+  const items=[
+    ...interactionsFor(store,person.id).map(i=>({date:i.date,label:"INTERACCIÓN",title:i.title,body:i.notes||i.type,action:"edit-interaction",id:i.id,tone:"human"})),
+    ...store.commitments.filter(c=>c.personId===person.id).map(c=>({date:c.dueDate||c.createdAt||"",label:"COMPROMISO",title:c.title,body:c.status==="done"?"Cumplido":"Pendiente",action:"edit-commitment",id:c.id,tone:c.status==="done"?"done":"commitment"})),
+    ...store.opportunities.filter(o=>o.personId===person.id).map(o=>({date:o.createdAt||"",label:"OPORTUNIDAD",title:o.title,body:[o.stage,o.notes].filter(Boolean).join(" · "),action:"edit-opportunity",id:o.id,tone:"opportunity"}))
+  ].filter(item=>item.date).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(!items.length)return `<p class="muted-copy">Todavía no hay historia registrada.</p>`;
+  return `<div class="relationship-timeline">${items.map(item=>`<button class="relationship-event ${item.tone}" data-action="${item.action}" data-id="${esc(item.id)}"><span class="relationship-event-date">${esc(formatDate(item.date))}</span><i></i><span class="relationship-event-copy"><small>${esc(item.label)}</small><strong>${esc(item.title)}</strong><span>${esc(item.body||"")}</span></span>${icon("arrow",13)}</button>`).join("")}</div>`;
+}
 
 function openPersonDrawer(personId) {
-  const person = personById(store, personId);
-  if (!person) return toast("La persona ya no existe.", "warn");
-  const interactions = interactionsFor(store, person.id);
-  const commitments = store.commitments.filter(c => c.personId === person.id);
-  const opportunities = store.opportunities.filter(o => o.personId === person.id);
-  const personMeetings = store.meetings.filter(m => m.personId === person.id).sort((a,b) => new Date(b.start) - new Date(a.start));
-  const rel = relationshipState(store, person);
-  const nextMeeting = upcomingMeetings(store).find(m => m.personId === person.id);
-
-  drawerContent.innerHTML = `
-    <div class="drawer-head"><button class="icon-btn drawer-close" data-action="close-drawer" aria-label="Cerrar">${icon("close")}</button><div class="drawer-person">${avatar(person, "avatar-lg")}<div><div class="drawer-title-line"><h2>${esc(person.name)}</h2>${circlePill(person.circle)}</div><p>${esc(personMeta(person))}${person.city ? ` · ${esc(person.city)}` : ""}</p></div></div><div class="drawer-actions"><button class="btn btn-ghost" data-action="edit-person" data-id="${esc(person.id)}">${icon("edit")} Editar</button><button class="btn btn-primary" data-action="capture-for-person" data-id="${esc(person.id)}">${icon("plus")} Registrar</button></div></div>
-
-    <div class="drawer-body">
-      <section class="relationship-strip"><div><span>Estado</span>${statePill(rel)}</div><div><span>Cadencia</span><strong>${person.cadenceDays} días</strong></div><div><span>Último registro</span><strong>${esc(interactions[0] ? formatRelative(interactions[0].date) : "Sin historial")}</strong></div><div><span>Próximo follow-up</span><strong>${esc(person.nextFollowUp ? formatDate(person.nextFollowUp) : "Sin fecha")}</strong></div></section>
-
-      ${nextMeeting ? `<section class="brief-banner"><div><span class="eyebrow">PRÓXIMA REUNIÓN</span><strong>${esc(nextMeeting.title)}</strong><span>${esc(formatDateTime(nextMeeting.start))}</span></div><button class="btn btn-small" data-action="brief-meeting" data-id="${esc(nextMeeting.id)}">Abrir brief</button></section>` : ""}
-
-      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">CONTEXTO</span><h3>Qué importa de esta relación</h3></div><button class="text-btn" data-action="edit-person" data-id="${esc(person.id)}">Editar</button></div><p class="context-copy">${esc(person.relation || "Todavía no agregaste contexto relacional.")}</p>${person.tags.length ? `<div class="tag-list">${person.tags.map(t => `<span>${esc(t)}</span>`).join("")}</div>` : ""}${person.notes ? `<div class="private-note"><span>NOTA</span><p>${esc(person.notes)}</p></div>` : ""}</section>
-
-      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">COMPROMISOS</span><h3>Pendientes y cumplidos</h3></div><button class="text-btn" data-action="capture-kind" data-kind="commitment" data-person-id="${esc(person.id)}">+ Agregar</button></div>${commitments.length ? `<div class="mini-list">${commitments.map(c => `<div class="mini-row ${c.status === "done" ? "done" : ""}"><button class="check-btn ${c.status === "done" ? "checked" : ""}" data-action="toggle-commitment" data-id="${esc(c.id)}">${icon("check",14)}</button><div><strong>${esc(c.title)}</strong><span>${c.dueDate ? formatDate(c.dueDate) : "Sin fecha"}</span></div><button class="icon-btn" data-action="edit-commitment" data-id="${esc(c.id)}">${icon("edit",15)}</button></div>`).join("")}</div>` : `<p class="muted-copy">Sin compromisos registrados.</p>`}</section>
-
-      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">OPORTUNIDADES</span><h3>Posibilidades abiertas</h3></div><button class="text-btn" data-action="capture-kind" data-kind="opportunity" data-person-id="${esc(person.id)}">+ Agregar</button></div>${opportunities.length ? `<div class="opportunity-list">${opportunities.map(o => `<button data-action="edit-opportunity" data-id="${esc(o.id)}"><div><strong>${esc(o.title)}</strong><span>${esc(o.notes || "Sin notas")}</span></div><span class="stage-pill">${esc(o.stage)}</span></button>`).join("")}</div>` : `<p class="muted-copy">Sin oportunidades registradas.</p>`}</section>
-
-      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">REUNIONES</span><h3>Agenda de esta relación</h3></div><button class="text-btn" data-action="capture-kind" data-kind="meeting" data-person-id="${esc(person.id)}">+ Agendar</button></div>${personMeetings.length ? `<div class="opportunity-list">${personMeetings.map(m => `<button data-action="edit-meeting" data-id="${esc(m.id)}"><div><strong>${esc(m.title)}</strong><span>${esc(formatDateTime(m.start))} · ${m.durationMin} min</span></div><span class="stage-pill">${m.status === "done" ? "Realizada" : "Próxima"}</span></button>`).join("")}</div>` : `<p class="muted-copy">Sin reuniones registradas.</p>`}</section>
-
-      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">HISTORIAL</span><h3>Interacciones</h3></div><button class="text-btn" data-action="capture-kind" data-kind="interaction" data-person-id="${esc(person.id)}">+ Registrar</button></div>${interactions.length ? `<div class="timeline">${interactions.map(i => `<article><div class="timeline-dot"></div><div class="timeline-date">${esc(formatDate(i.date))}</div><div class="timeline-content"><div class="timeline-title"><strong>${esc(i.title)}</strong><span>${esc(i.type)}</span></div>${i.notes ? `<p>${esc(i.notes)}</p>` : ""}<button class="text-btn subtle" data-action="edit-interaction" data-id="${esc(i.id)}">Editar</button></div></article>`).join("")}</div>` : `<p class="muted-copy">Todavía no registraste interacciones.</p>`}</section>
-
-      <section class="drawer-section contact-section"><div class="section-head"><div><span class="eyebrow">CONTACTO</span><h3>Datos básicos</h3></div><button class="text-btn" data-action="edit-person" data-id="${esc(person.id)}">Editar</button></div><div class="contact-grid">${person.email ? `<a href="mailto:${esc(person.email)}">${icon("mail")}<span>${esc(person.email)}</span></a>` : `<span>${icon("mail")}<span>Sin email</span></span>`}${person.phone ? `<a href="tel:${esc(person.phone)}">${icon("phone")}<span>${esc(person.phone)}</span></a>` : `<span>${icon("phone")}<span>Sin teléfono</span></span>`}${person.linkedin ? `<a href="${esc(safeExternalUrl(person.linkedin))}" target="_blank" rel="noreferrer">${icon("external")}<span>LinkedIn</span></a>` : `<span>${icon("external")}<span>Sin LinkedIn</span></span>`}</div></section>
-
+  const person=personById(store,personId);
+  if(!person)return toast("La persona ya no existe.","warn");
+  const commitments=store.commitments.filter(c=>c.personId===person.id),openCommitments=commitments.filter(c=>c.status!=="done");
+  const opportunities=store.opportunities.filter(o=>o.personId===person.id),openOpportunities=opportunities.filter(o=>o.stage!=="Cerrada");
+  const rel=relationshipState(store,person),last=lastInteraction(store,person.id);
+  const goal=store.profile.currentGoal||"",goalMatch=goal.trim()?buildRelationalOpportunities(store,goal).find(item=>item.contact_id===person.id):null;
+  drawerContent.innerHTML=`
+    <div class="drawer-head v06-person-head"><button class="icon-btn drawer-close" data-action="close-drawer" aria-label="Cerrar">${icon("close")}</button><div class="drawer-person">${avatar(person,"avatar-lg")}<div><span class="eyebrow">RELACIÓN</span><div class="drawer-title-line"><h2>${esc(person.name)}</h2></div><p>${esc(personMeta(person))}${person.city?` · ${esc(person.city)}`:""}</p></div></div><div class="drawer-actions"><button class="btn btn-ghost" data-action="edit-person" data-id="${esc(person.id)}">${icon("edit")} EDITAR</button><button class="btn btn-primary" data-action="capture-for-person" data-id="${esc(person.id)}">${icon("plus")} REGISTRAR</button></div></div>
+    <div class="drawer-body v06-person-body">
+      <section class="relationship-hero-meta"><div>${circlePill(person.circle)}</div><div>${statePill(rel)}</div><div><span>ÚLTIMO CONTACTO</span><strong>${esc(last?formatRelative(last.date):"Sin historial")}</strong></div></section>
+      <section class="drawer-section person-now"><div class="section-head"><div><span class="eyebrow">AHORA</span><h3>Por qué esta relación importa hoy</h3></div></div>
+        <div class="person-now-grid">
+          ${openCommitments[0]?`<button data-action="edit-commitment" data-id="${esc(openCommitments[0].id)}"><small>COMPROMISO ABIERTO</small><strong>${esc(openCommitments[0].title)}</strong><span>${openCommitments[0].dueDate?esc(formatDate(openCommitments[0].dueDate)):"Sin fecha"}</span></button>`:""}
+          ${openOpportunities[0]?`<button data-action="edit-opportunity" data-id="${esc(openOpportunities[0].id)}"><small>OPORTUNIDAD</small><strong>${esc(openOpportunities[0].title)}</strong><span>${esc(openOpportunities[0].stage)}</span></button>`:""}
+          ${goalMatch?`<button class="goal-match" data-action="agent-opportunity" data-id="${esc(person.id)}"><small>OBJETIVO ACTUAL</small><strong>${goalMatch.relevance_score} relevancia</strong><span>${esc(goalMatch.reason)}</span></button>`:""}
+          ${!nextMeeting&&!openCommitments.length&&!openOpportunities.length&&!goalMatch?`<div class="person-now-empty"><strong>Sin movimiento pendiente.</strong><span>Registrá una interacción cuando haya contexto nuevo.</span></div>`:""}
+        </div>
+      </section>
+      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">CONTEXTO</span><h3>Qué conviene recordar</h3></div><button class="text-btn" data-action="edit-person" data-id="${esc(person.id)}">EDITAR</button></div><p class="context-copy">${esc(person.relation||"Todavía no agregaste contexto relacional.")}</p>${person.tags.length?`<div class="tag-list">${person.tags.map(t=>`<span>${esc(t)}</span>`).join("")}</div>`:""}${person.notes?`<div class="private-note"><span>NOTA PRIVADA</span><p>${esc(person.notes)}</p></div>`:""}</section>
+      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">COMPROMISOS</span><h3>Pendientes y cumplidos</h3></div><button class="text-btn" data-action="capture-kind" data-kind="commitment" data-person-id="${esc(person.id)}">AGREGAR +</button></div>${commitments.length?`<div class="mini-list">${commitments.map(c=>`<div class="mini-row ${c.status==="done"?"done":""}"><button class="check-btn ${c.status==="done"?"checked":""}" data-action="toggle-commitment" data-id="${esc(c.id)}">${icon("check",14)}</button><div><strong>${esc(c.title)}</strong><span>${c.dueDate?formatDate(c.dueDate):"Sin fecha"}</span></div><button class="icon-btn" data-action="edit-commitment" data-id="${esc(c.id)}">${icon("edit",15)}</button></div>`).join("")}</div>`:`<p class="muted-copy">Sin compromisos registrados.</p>`}</section>
+      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">OPORTUNIDADES</span><h3>Posibilidades abiertas</h3></div><button class="text-btn" data-action="capture-kind" data-kind="opportunity" data-person-id="${esc(person.id)}">AGREGAR +</button></div>${opportunities.length?`<div class="opportunity-list">${opportunities.map(o=>`<button data-action="edit-opportunity" data-id="${esc(o.id)}"><div><strong>${esc(o.title)}</strong><span>${esc(o.notes||"Sin notas")}</span></div><span class="stage-pill">${esc(o.stage)}</span></button>`).join("")}</div>`:`<p class="muted-copy">Sin oportunidades registradas.</p>`}</section>
+      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">HISTORIA</span><h3>Memoria longitudinal</h3></div><button class="text-btn" data-action="capture-kind" data-kind="interaction" data-person-id="${esc(person.id)}">REGISTRAR +</button></div>${relationshipTimeline(person)}</section>
+      <section class="drawer-section contact-section"><div class="section-head"><div><span class="eyebrow">DATOS DE CONTACTO</span><h3>Información secundaria</h3></div><button class="text-btn" data-action="edit-person" data-id="${esc(person.id)}">EDITAR</button></div><div class="contact-grid">${person.email?`<a href="mailto:${esc(person.email)}">${icon("mail")}<span>${esc(person.email)}</span></a>`:`<span>${icon("mail")}<span>Sin email</span></span>`}${person.phone?`<a href="tel:${esc(person.phone)}">${icon("phone")}<span>${esc(person.phone)}</span></a>`:`<span>${icon("phone")}<span>Sin teléfono</span></span>`}${person.linkedin?`<a href="${esc(safeExternalUrl(person.linkedin))}" target="_blank" rel="noreferrer">${icon("external")}<span>LinkedIn</span></a>`:`<span>${icon("external")}<span>Sin LinkedIn</span></span>`}</div></section>
       <section class="drawer-danger"><button class="text-danger" data-action="delete-person" data-id="${esc(person.id)}">${icon("trash",15)} Eliminar persona y sus registros</button></section>
     </div>`;
   openDrawer();
 }
 
-
 function openAgentOpportunity(personId) {
-  const goal = store.profile.currentGoal || "";
-  const result = buildRelationalOpportunities(store, goal).find(item => item.contact_id === personId);
-  const person = personById(store, personId);
-  if (!result || !person) return toast("No hay evidencia suficiente para esta oportunidad.", "warn");
-  drawerContent.innerHTML = `
-    <div class="drawer-head">
+  const goal=store.profile.currentGoal||"";
+  const result=buildRelationalOpportunities(store,goal).find(item=>item.contact_id===personId);
+  const person=personById(store,personId);
+  if(!result||!person)return toast("No hay evidencia suficiente para esta oportunidad.","warn");
+  drawerContent.innerHTML=`
+    <div class="drawer-head agent-evidence-head">
       <button class="icon-btn drawer-close" data-action="close-drawer" aria-label="Cerrar">${icon("close")}</button>
-      <div>
-        <span class="eyebrow">OPORTUNIDAD RELACIONAL</span>
-        <h2>${esc(person.name)}</h2>
-        <p>${esc(personMeta(person))}</p>
-      </div>
+      <div><span class="eyebrow">POR QUÉ ORBITA TE MUESTRA ESTA RELACIÓN</span><h2>${esc(person.name)}</h2><p>${esc(personMeta(person))}</p></div>
       <div class="agent-drawer-score"><strong>${result.relevance_score}</strong><span>RELEVANCIA</span></div>
     </div>
-    <div class="drawer-body agent-drawer">
-      <section class="agent-goal-context">
-        <span class="eyebrow">OBJETIVO</span>
-        <strong>${esc(goal)}</strong>
-        <p>${esc(result.reason)}</p>
-      </section>
+    <div class="drawer-body agent-drawer v06-evidence-drawer">
+      <section class="agent-goal-context"><span class="eyebrow">OBJETIVO ACTUAL</span><strong>${esc(goal)}</strong><p>${esc(result.reason)}</p></section>
+      <section class="drawer-section fact-zone"><div class="section-head"><div><span class="eyebrow">EVIDENCIA FACTUAL</span><h3>Lo que está registrado</h3></div><span class="evidence-count">${result.evidence.length} fuente${result.evidence.length===1?"":"s"}</span></div><div class="evidence-list">${result.evidence.map(fact=>`<article><span>${esc(fact.source)}</span><p>${esc(fact.text)}</p>${fact.date?`<time>${esc(formatDate(fact.date))}</time>`:""}</article>`).join("")}</div></section>
+      <section class="drawer-section inference-box"><span class="eyebrow">INFERENCIA DE ORBITA</span><p>${esc(result.inference)}</p><small>Confianza ${esc(result.confidence)} · Esta capa interpreta evidencia; no la reemplaza.</small></section>
+      <section class="next-action-box"><span class="eyebrow">SIGUIENTE MOVIMIENTO</span><strong>${esc(result.suggested_action)}</strong></section>
+      <div class="drawer-footer-actions"><button class="btn btn-primary" data-action="open-person" data-id="${esc(person.id)}">${icon("person")} ABRIR RELACIÓN</button><button class="btn btn-ghost" data-action="capture-kind" data-kind="interaction" data-person-id="${esc(person.id)}">${icon("note")} REGISTRAR INTERACCIÓN</button></div>
+    </div>`;
+  openDrawer();
+}
 
-      <section class="drawer-section">
-        <span class="eyebrow">HECHOS USADOS</span>
-        <h3>Evidencia trazable</h3>
-        <div class="evidence-list">
-          ${result.evidence.map(fact => `<article><span>${esc(fact.source)}</span><p>${esc(fact.text)}</p></article>`).join("")}
-        </div>
-      </section>
-
-      <section class="drawer-section inference-box">
-        <span class="eyebrow">INFERENCIA</span>
-        <p>${esc(result.inference)}</p>
-        <small>Confianza: ${esc(result.confidence)} · Esto es una inferencia de ÓRBITA, no un hecho guardado.</small>
-      </section>
-
-      <section class="next-action-box">
-        <span class="eyebrow">SIGUIENTE ACCIÓN</span>
-        <strong>${esc(result.suggested_action)}</strong>
-      </section>
-
-      <div class="drawer-footer-actions">
-        <button class="btn btn-primary" data-action="open-person" data-id="${esc(person.id)}">${icon("person")} Abrir relación</button>
-        <button class="btn btn-ghost" data-action="capture-kind" data-kind="interaction" data-person-id="${esc(person.id)}">${icon("note")} Registrar interacción</button>
+function openCapture(personId="") {
+  ui.capturePersonId=personId;
+  ui.captureKind="";
+  ui.captureDraft="";
+  modalContent.innerHTML=`
+    <div class="modal-head capture-head"><div><span class="eyebrow">CAPTURAR</span><h2>¿Qué pasó?</h2><p>Escribí contexto libre y después elegí cómo guardarlo. ORBITA mantiene estructura y trazabilidad; no inventa campos automáticamente.</p></div><button class="icon-btn" data-action="close-modal">${icon("close")}</button></div>
+    <div class="capture-v06">
+      <label class="capture-draft-label" for="capture-draft"><span>CONTEXTO RÁPIDO</span><textarea id="capture-draft" rows="5" placeholder="Me crucé con Pablo en un evento. Está buscando startups para invertir. Le prometí mandarle la demo el lunes."></textarea></label>
+      <div class="capture-type-label"><span>¿CÓMO QUERÉS GUARDARLO?</span><small>Elegí un tipo para completar solo los campos necesarios.</small></div>
+      <div class="capture-types">
+        ${captureType("person","person","Persona","Crear una nueva relación")}
+        ${captureType("interaction","note","Interacción","Registrar lo que pasó")}
+        ${captureType("commitment","check","Compromiso","Guardar un próximo paso")}
+        ${captureType("opportunity","spark","Oportunidad","Registrar una posibilidad")}
       </div>
     </div>`;
-  openDrawer();
-}
-
-function openMeetingBrief(meetingId) {
-  const brief = buildMeetingBrief(store, meetingId);
-  if (!brief) return toast("No pude construir el brief.", "warn");
-  const { meeting, person, interactions, commitments, opportunities, relationship, context, suggestedFocus } = brief;
-  drawerContent.innerHTML = `
-    <div class="drawer-head"><button class="icon-btn drawer-close" data-action="close-drawer">${icon("close")}</button><div><span class="eyebrow">MEETING BRIEF</span><h2>${esc(meeting.title)}</h2><p>${esc(formatDateTime(meeting.start))} · ${meeting.durationMin} min</p></div><div class="drawer-actions"><button class="btn btn-ghost" data-action="edit-meeting" data-id="${esc(meeting.id)}">${icon("edit")} Editar</button></div></div>
-    <div class="drawer-body brief-body">
-      <section class="brief-person">${avatar(person, "avatar-lg")}<div><strong>${esc(person.name)}</strong><span>${esc(personMeta(person))}</span></div>${statePill(relationship)}</section>
-      <section class="brief-focus"><span class="eyebrow">FOCO SUGERIDO</span><h3>${esc(suggestedFocus)}</h3><p>Esta sugerencia sale de tus compromisos y oportunidades abiertas; no de una inferencia externa.</p></section>
-      <section class="drawer-section"><span class="eyebrow">CONTEXTO RELACIONAL</span><p class="context-copy">${esc(context)}</p></section>
-      <div class="brief-columns"><section class="drawer-section"><div class="section-head"><div><span class="eyebrow">PENDIENTES</span><h3>Compromisos</h3></div></div>${commitments.length ? commitments.map(c => `<div class="brief-item"><span class="brief-bullet"></span><div><strong>${esc(c.title)}</strong><span>${c.dueDate ? formatDate(c.dueDate) : "Sin fecha"}</span></div></div>`).join("") : `<p class="muted-copy">Sin compromisos abiertos.</p>`}</section><section class="drawer-section"><div class="section-head"><div><span class="eyebrow">POSIBILIDADES</span><h3>Oportunidades</h3></div></div>${opportunities.length ? opportunities.map(o => `<div class="brief-item"><span class="brief-bullet violet"></span><div><strong>${esc(o.title)}</strong><span>${esc(o.stage)}</span></div></div>`).join("") : `<p class="muted-copy">Sin oportunidades abiertas.</p>`}</section></div>
-      <section class="drawer-section"><div class="section-head"><div><span class="eyebrow">ÚLTIMOS REGISTROS</span><h3>Historia reciente</h3></div></div>${interactions.length ? interactions.map(i => `<div class="brief-history"><span>${esc(formatDate(i.date))}</span><div><strong>${esc(i.title)}</strong><p>${esc(i.notes || "Sin notas")}</p></div></div>`).join("") : `<p class="muted-copy">Sin historial todavía.</p>`}</section>
-      ${meeting.notes ? `<section class="drawer-section"><span class="eyebrow">NOTA DE LA REUNIÓN</span><p class="context-copy">${esc(meeting.notes)}</p></section>` : ""}
-      <div class="drawer-footer-actions"><button class="btn btn-primary" data-action="capture-kind" data-kind="interaction" data-person-id="${esc(person.id)}">${icon("note")} Registrar resultado</button><button class="btn btn-ghost" data-action="done-meeting" data-id="${esc(meeting.id)}">${icon("check")} Marcar realizada</button></div>
-    </div>`;
-  openDrawer();
-}
-
-function openCapture(personId = "") {
-  ui.capturePersonId = personId;
-  ui.captureKind = "";
-  modalContent.innerHTML = `
-    <div class="modal-head"><div><span class="eyebrow">CAPTURAR</span><h2>¿Qué querés registrar?</h2><p>Elegí el tipo de información. Todo se puede editar después.</p></div><button class="icon-btn" data-action="close-modal">${icon("close")}</button></div>
-    <div class="capture-types">
-      ${captureType("person", "person", "Persona", "Alguien que querés recordar con contexto")}
-      ${captureType("interaction", "note", "Interacción", "Reunión, mensaje, llamada, café o nota")}
-      ${captureType("commitment", "check", "Compromiso", "Algo que vos o la relación dejó pendiente")}
-      ${captureType("meeting", "calendar", "Reunión", "Un encuentro futuro que querés preparar")}
-      ${captureType("opportunity", "spark", "Oportunidad", "Una posibilidad que vale la pena seguir")}
-    </div>`;
   openModal();
+}
+
+function applyCaptureDraft(kind,draft){
+  if(!draft)return;
+  const form=document.querySelector("#entity-form");
+  if(!form)return;
+  const firstLine=draft.split(/[.!?\n]/)[0].trim().slice(0,120);
+  const title=form.elements?.title;
+  const notes=form.elements?.notes;
+  const relation=form.elements?.relation;
+  if(title&&!title.value)title.value=firstLine||draft.slice(0,120);
+  if(notes&&!notes.value)notes.value=draft;
+  if(kind==="person"&&relation&&!relation.value)relation.value=draft;
 }
 
 function captureType(kind, iconName, title, body) {
@@ -619,24 +710,13 @@ function openEntityForm(kind, id = "", presetPersonId = "") {
       ${selectField("Etapa", "stage", ["Idea", "Explorando", "Activa", "Cerrada"], entity?.stage || "Idea")}
       ${textareaField("Notas", "notes", entity?.notes || "", "Por qué importa, qué falta validar, próximo paso.")}
     </div>`, id);
-  } else if (kind === "meeting") {
-    const entity = id ? store.meetings.find(x => x.id === id) : null;
-    const future = new Date(); future.setHours(future.getHours() + 1, 0, 0, 0);
-    html = formShell(kind, entity ? "Editar reunión" : "Nueva reunión", "Agendala manualmente para que ORBITA pueda prepararte el contexto.", `<div class="form-grid">
-      ${personSelectField(entity?.personId || presetPersonId)}
-      ${field("Título", "title", entity?.title || "", { required: true, wide: true, placeholder: "Ej. Café de seguimiento" })}
-      ${field("Fecha y hora", "start", localDateTime(entity?.start || future.toISOString()), { type: "datetime-local", required: true })}
-      ${field("Duración (min)", "durationMin", entity?.durationMin || 30, { type: "number", min: 5, max: 480 })}
-      ${selectField("Estado", "status", [{value:"upcoming",label:"Próxima"},{value:"done",label:"Realizada"}], entity?.status || "upcoming")}
-      ${textareaField("Objetivo / nota", "notes", entity?.notes || "", "Qué querés conversar o recordar antes de entrar.")}
-    </div>`, id);
   } else if (kind === "profile") {
     html = formShell(kind, "Tu espacio", "Identidad, foco y preferencias relacionales. Todo se puede cambiar.", `<div class="form-grid">
       ${field("Nombre del espacio", "name", store.profile.name, { required: true })}
       ${field("Rol", "role", store.profile.role)}
       ${field("Foco", "focus", store.profile.focus, { wide: true })}
       ${field("Cadencia base (días)", "defaultCadenceDays", store.profile.defaultCadenceDays || 30, { type: "number", min: 1, max: 365 })}
-      ${field("Objetivos", "goals", (store.profile.goals || []).join(", "), { wide: true, hint: "Ej: followups, meetings, network, opportunities" })}
+      ${field("Objetivos", "goals", (store.profile.goals || []).join(", "), { wide: true, hint: "Ej: followups, network, opportunities" })}
     </div>`, "profile");
   }
   modalContent.innerHTML = html;
@@ -661,9 +741,6 @@ function submitEntityForm(form) {
   } else if (kind === "opportunity") {
     const payload = { id: id || makeId("o"), personId: data.personId, title: data.title.trim(), stage: data.stage, notes: data.notes.trim(), createdAt: id ? store.opportunities.find(x=>x.id===id)?.createdAt : new Date().toISOString() };
     if (id) store.opportunities = store.opportunities.map(x => x.id === id ? payload : x); else store.opportunities.push(payload);
-  } else if (kind === "meeting") {
-    const payload = { id: id || makeId("m"), personId: data.personId, title: data.title.trim(), start: new Date(data.start).toISOString(), durationMin: Number(data.durationMin || 30), notes: data.notes.trim(), status: data.status };
-    if (id) store.meetings = store.meetings.map(x => x.id === id ? payload : x); else store.meetings.push(payload);
   } else if (kind === "profile") {
     store.profile = {
       ...store.profile,
@@ -679,7 +756,7 @@ function submitEntityForm(form) {
 }
 
 function deleteEntity(kind, id) {
-  const map = { interaction: "interactions", commitment: "commitments", opportunity: "opportunities", meeting: "meetings" };
+  const map = { interaction: "interactions", commitment: "commitments", opportunity: "opportunities" };
   const collection = map[kind];
   if (!collection) return;
   if (!confirm("¿Eliminar este registro? Esta acción no se puede deshacer.")) return;
@@ -749,7 +826,6 @@ function renderCommandResults(query) {
   const actions = [
     { label: "Capturar interacción", kind: "interaction", icon: "note" },
     { label: "Agregar persona", kind: "person", icon: "person" },
-    { label: "Agendar reunión", kind: "meeting", icon: "calendar" },
     { label: "Crear compromiso", kind: "commitment", icon: "check" }
   ].filter(a => !q || a.label.toLowerCase().includes(q));
   const interactions = q ? store.interactions.filter(i => `${i.title} ${i.notes}`.toLowerCase().includes(q)).slice(0, 5) : [];
@@ -793,7 +869,7 @@ function showAuth(view = "login", message = "") {
   const [eyebrow, title] = titles[view] || titles.login;
   let form = "";
   if (!configured) {
-    form = `<div class="auth-notice"><strong>FUNCTIONAL ALPHA · ACCESO LOCAL</strong><p>ORBITA ya puede usarse de punta a punta sin depender del backend. Tus relaciones, agenda, contexto y cambios quedan guardados en este navegador mientras terminamos la integración cloud.</p></div><button class="auth-primary" data-action="auth-local">ENTRAR A ORBITA →</button><p class="auth-footnote">Backend-ready: Auth, sync y persistencia cloud están desacoplados detrás de adaptadores y se activan cuando pasen QA.</p>`;
+    form = `<div class="auth-notice"><strong>ACCESO A ORBITA</strong><p>Entrá a tu espacio relacional y seguí trabajando con tu red y tu contexto.</p></div><button class="auth-primary" data-action="auth-local">ENTRAR →</button><p class="auth-footnote">Tus datos permanecen en este dispositivo mientras no conectes una cuenta.</p>`;
   } else if (view === "signup") {
     form = `<form id="auth-signup-form" class="auth-form"><label><span>NOMBRE</span><input name="name" autocomplete="name" placeholder="Iván" /></label><label><span>EMAIL</span><input name="email" type="email" autocomplete="email" required placeholder="vos@empresa.com" /></label><label><span>CONTRASEÑA</span><input name="password" type="password" autocomplete="new-password" minlength="12" required placeholder="12+ caracteres" /><small>12+ caracteres · mayúscula · minúscula · número · símbolo</small></label><button class="auth-primary" type="submit">CREAR CUENTA →</button></form><button class="auth-link" data-action="auth-view" data-value="login">Ya tengo cuenta</button>`;
   } else if (view === "recover") {
@@ -803,7 +879,7 @@ function showAuth(view = "login", message = "") {
   } else {
     form = `<form id="auth-login-form" class="auth-form"><label><span>EMAIL</span><input name="email" type="email" autocomplete="email" required placeholder="vos@empresa.com" /></label><label><span>CONTRASEÑA</span><input name="password" type="password" autocomplete="current-password" required /></label><button class="auth-primary" type="submit">INGRESAR →</button></form><div class="auth-links"><button class="auth-link" data-action="auth-view" data-value="recover">Olvidé mi contraseña</button><button class="auth-link" data-action="auth-view" data-value="signup">Crear cuenta</button></div>`;
   }
-  authContent.innerHTML = `<section class="auth-brand"><img src="/assets/orbita-mark.svg" alt=""/><strong>ORBITA</strong><span>INTELIGENCIA RELACIONAL</span><p>Tu red no es una lista de contactos.<br/>Es contexto, historia y próximos movimientos.</p></section><section class="auth-card"><div class="auth-card-head"><span>${eyebrow}</span><h1>${title}</h1><p>${configured ? "Acceso privado a tu espacio relacional." : "Prototipo funcional navegable · persistencia local · backend preparado para integración."}</p></div>${message ? `<div class="auth-message">${esc(message)}</div>` : ""}${form}<div class="auth-security">${icon("shield",16)} <span>ORBITA nunca necesita una secret/service key en el navegador.</span></div></section>`;
+  authContent.innerHTML = `<section class="auth-brand"><img src="/assets/orbita-mark.svg" alt=""/><strong>ORBITA</strong><span>INTELIGENCIA RELACIONAL</span><p>Tu red no es una lista de contactos.<br/>Es contexto, historia y próximos movimientos.</p></section><section class="auth-card"><div class="auth-card-head"><span>${eyebrow}</span><h1>${title}</h1><p>${configured ? "Acceso privado a tu espacio relacional." : "Acceso directo a tu espacio relacional."}</p></div>${message ? `<div class="auth-message">${esc(message)}</div>` : ""}${form}<div class="auth-security">${icon("shield",16)} <span>ORBITA nunca necesita una secret/service key en el navegador.</span></div></section>`;
   hydrateIcons(authContent);
   setTimeout(() => authContent.querySelector("input")?.focus(), 30);
 }
@@ -814,26 +890,21 @@ function hideAuth() {
   appRoot.classList.remove("app-locked");
 }
 
-function showOnboarding(step = ui.onboardingStep) {
-  ui.onboardingStep = Math.max(0, Math.min(3, step));
+function showOnboarding(step=ui.onboardingStep) {
+  ui.onboardingStep=Math.max(0,Math.min(2,step));
   onboardingShell.classList.add("open");
-  onboardingShell.setAttribute("aria-hidden", "false");
-  const hasCurrent = store.people.length > 0;
-  const hasLegacy = Boolean(legacyStore());
-  const progress = [0,1,2,3].map(i => `<i class="${i <= ui.onboardingStep ? "active" : ""}"></i>`).join("");
-  let body = "";
-  if (ui.onboardingStep === 0) {
-    body = `<div class="onboard-hero"><span class="eyebrow">BIENVENIDO A ORBITA</span><h1>Construí memoria alrededor de tus relaciones.</h1><p>En menos de dos minutos dejamos listo tu espacio. Podés cambiar todo después.</p><div class="onboard-principles"><div><strong>01</strong><span>Personas con contexto</span></div><div><strong>02</strong><span>Próximos movimientos claros</span></div><div><strong>03</strong><span>Tu información bajo control</span></div></div><button class="auth-primary" data-action="onboarding-next">CONFIGURAR MI ESPACIO →</button></div>`;
-  } else if (ui.onboardingStep === 1) {
-    body = `<form id="onboarding-profile-form" class="onboard-form"><span class="eyebrow">01 · IDENTIDAD</span><h2>¿Cómo querés usar ORBITA?</h2><p>Esto personaliza el lenguaje del producto.</p><div class="form-grid"><label class="form-field"><span>NOMBRE DEL ESPACIO</span><input name="name" required value="${esc(store.profile.name === "Mi espacio" ? "" : store.profile.name)}" placeholder="Iván / KadmonTech"/></label><label class="form-field"><span>ROL</span><input name="role" value="${esc(store.profile.role)}" placeholder="Founder"/></label><label class="form-field wide"><span>FOCO PRINCIPAL</span><input name="focus" value="${esc(store.profile.focus)}" placeholder="Networking, fundraising, alianzas…"/></label></div><div class="onboard-actions"><button type="button" class="btn btn-ghost" data-action="onboarding-back">Atrás</button><button class="btn btn-primary" type="submit">Continuar →</button></div></form>`;
-  } else if (ui.onboardingStep === 2) {
-    const goals = new Set(store.profile.goals || []);
-    const options = [["followups","No perder seguimientos"],["meetings","Llegar mejor preparado a reuniones"],["network","Entender mejor mi red"],["opportunities","Detectar oportunidades"],["memory","Recordar contexto importante"],["introductions","Conectar personas con intención"]];
-    body = `<form id="onboarding-goals-form" class="onboard-form"><span class="eyebrow">02 · OBJETIVOS</span><h2>¿Qué querés que ORBITA cuide?</h2><p>Elegí lo que más importa hoy. No estamos fijando tu futuro.</p><div class="goal-grid">${options.map(([id,label])=>`<label class="goal-option"><input type="checkbox" name="goals" value="${id}" ${goals.has(id)?"checked":""}/><span>${icon("check",16)}</span><strong>${label}</strong></label>`).join("")}</div><label class="form-field cadence-field"><span>CADENCIA BASE SUGERIDA</span><select name="defaultCadenceDays"><option value="14" ${store.profile.defaultCadenceDays===14?"selected":""}>14 días</option><option value="30" ${store.profile.defaultCadenceDays===30?"selected":""}>30 días</option><option value="45" ${store.profile.defaultCadenceDays===45?"selected":""}>45 días</option><option value="60" ${store.profile.defaultCadenceDays===60?"selected":""}>60 días</option></select></label><div class="onboard-actions"><button type="button" class="btn btn-ghost" data-action="onboarding-back">Atrás</button><button class="btn btn-primary" type="submit">Continuar →</button></div></form>`;
-  } else {
-    body = `<div class="onboard-form"><span class="eyebrow">03 · PUNTO DE PARTIDA</span><h2>Elegí cómo empezar.</h2><p>ORBITA es manual-first por ahora. La entrada automática llegará después de entender qué información realmente vale.</p><div class="start-options">${hasCurrent?`<button data-action="onboarding-finish" data-value="keep"><span>${icon("database",21)}</span><div><strong>CONSERVAR MIS DATOS</strong><p>Seguir con las ${store.people.length} personas que ya están en este espacio.</p></div>${icon("arrow",16)}</button>`:""}${hasLegacy?`<button data-action="onboarding-finish" data-value="legacy"><span>${icon("upload",21)}</span><div><strong>RECUPERAR VERSIÓN ANTERIOR</strong><p>Encontramos datos locales de ORBITA V0.4 en este navegador.</p></div>${icon("arrow",16)}</button>`:""}<button data-action="onboarding-finish" data-value="demo"><span>${icon("spark",21)}</span><div><strong>EXPLORAR CON DEMO</strong><p>16 relaciones ficticias para entender el producto completo.</p></div>${icon("arrow",16)}</button><button data-action="onboarding-finish" data-value="empty"><span>${icon("plus",21)}</span><div><strong>EMPEZAR DESDE CERO</strong><p>Un espacio limpio. Tu primera acción será agregar una persona.</p></div>${icon("arrow",16)}</button></div><div class="onboard-actions"><button class="btn btn-ghost" data-action="onboarding-back">Atrás</button></div></div>`;
+  onboardingShell.setAttribute("aria-hidden","false");
+  const hasCurrent=store.people.length>0;
+  const progress=[0,1,2].map(i=>`<i class="${i<=ui.onboardingStep?"active":""}"></i>`).join("");
+  let body="";
+  if(ui.onboardingStep===0){
+    body=`<div class="onboard-hero v06-onboard-hero"><span class="eyebrow">INTELIGENCIA RELACIONAL</span><h1>Tu red ya contiene oportunidades que probablemente no estás viendo.</h1><p>ORBITA convierte contexto real en mejores decisiones, sin transformar personas en leads ni inventar conexiones.</p><div class="onboard-loop"><span>OBJETIVO</span><i>→</i><span>RED</span><i>→</i><span>EVIDENCIA</span><i>→</i><span>OPORTUNIDAD</span><i>→</i><span>ACCIÓN</span></div><div class="onboard-primary-actions"><button class="auth-primary" data-action="onboarding-next">CREAR MI ÓRBITA →</button><button class="btn btn-ghost" data-action="onboarding-finish" data-value="demo">EXPLORAR DEMO</button></div></div>`;
+  }else if(ui.onboardingStep===1){
+    body=`<form id="onboarding-profile-form" class="onboard-form v06-onboard-form"><span class="eyebrow">01 · TU ESPACIO</span><h2>Primero, ubicá tu contexto.</h2><p>Solo lo mínimo para que la experiencia se sienta propia.</p><div class="form-grid"><label class="form-field"><span>NOMBRE</span><input name="name" required value="${esc(store.profile.name==="Mi espacio"?"":store.profile.name)}" placeholder="Iván"/></label><label class="form-field"><span>ROL</span><input name="role" value="${esc(store.profile.role)}" placeholder="Founder"/></label><label class="form-field wide"><span>PROYECTO / EMPRESA</span><input name="focus" value="${esc(store.profile.focus==="Networking profesional"?"":store.profile.focus)}" placeholder="SØD Ecosystem"/></label></div><div class="onboard-actions"><button type="button" class="btn btn-ghost" data-action="onboarding-back">ATRÁS</button><button class="btn btn-primary" type="submit">CONTINUAR →</button></div></form>`;
+  }else{
+    body=`<form id="onboarding-goal-form" class="onboard-form v06-goal-onboarding"><span class="eyebrow">02 · OBJETIVO ACTUAL</span><h2>¿Qué querés lograr ahora?</h2><p>Podés cambiarlo cuando quieras. ORBITA usa este objetivo para ordenar la red por relevancia contextual.</p><label class="onboard-goal-field"><textarea name="goal" rows="3" maxlength="280" required placeholder="Estoy levantando una ronda pre-seed">${esc(store.profile.currentGoal||"")}</textarea></label><div class="goal-examples"><button type="button" data-action="goal-example" data-value="Encontrar clientes">Encontrar clientes</button><button type="button" data-action="goal-example" data-value="Buscar inversores">Buscar inversores</button><button type="button" data-action="goal-example" data-value="Conseguir feedback">Conseguir feedback</button><button type="button" data-action="goal-example" data-value="Encontrar talento">Encontrar talento</button></div><div class="onboard-actions"><button type="button" class="btn btn-ghost" data-action="onboarding-back">ATRÁS</button><button class="btn btn-acid" type="submit">ENTRAR A MI RED →</button></div>${hasCurrent?`<small class="onboard-existing">Tus ${store.people.length} relaciones actuales se conservan.</small>`:""}</form>`;
   }
-  onboardingContent.innerHTML = `<section class="onboard-shell"><header><div class="onboard-brand"><img src="/assets/orbita-mark.svg" alt=""/><strong>ORBITA</strong></div><div class="onboard-progress">${progress}</div><button class="onboard-skip" data-action="onboarding-finish" data-value="keep">Saltar</button></header>${body}</section>`;
+  onboardingContent.innerHTML=`<section class="onboard-shell v06-onboard-shell"><header><div class="onboard-brand"><img src="/assets/orbita-mark.svg" alt=""/><strong>ORBITA</strong></div><div class="onboard-progress">${progress}</div>${hasCurrent?`<button class="onboard-skip" data-action="onboarding-finish" data-value="keep">Cerrar</button>`:"<span></span>"}</header>${body}</section>`;
   hydrateIcons(onboardingContent);
 }
 
@@ -844,7 +915,10 @@ function hideOnboarding() {
 
 function finishOnboarding(mode = "keep") {
   const profile = { ...store.profile };
-  if (mode === "demo") store = normalizeStore(deepClone(seedStore));
+  if (mode === "demo") {
+    store = normalizeStore(deepClone(seedStore));
+    if (!profile.currentGoal) profile.currentGoal = "Estoy levantando una ronda pre-seed";
+  }
   else if (mode === "legacy") store = legacyStore() || store;
   else if (mode === "empty") store = normalizeStore({ profile, people: [], interactions: [], commitments: [], opportunities: [], meetings: [] });
   store.profile = { ...store.profile, ...profile, onboardingComplete: true };
@@ -865,21 +939,20 @@ function openDeleteAccountModal() {
 
 function openHelp(topic = currentRoute()) {
   const guides = {
-    today: ["HOY", "Tu centro de mando", "Acá aparecen reuniones próximas, compromisos y relaciones que necesitan atención. No es un feed: debería ayudarte a decidir qué hacer."],
-    people: ["PERSONAS", "Tu memoria relacional", "Abrí cualquier persona para editar contexto, registrar interacciones, compromisos, reuniones y oportunidades."],
+    today: ["HOY", "Tu centro de mando", "Acá viven tu objetivo actual, oportunidades explicables y relaciones que necesitan atención. No es un feed: debería ayudarte a decidir qué hacer."],
+    people: ["PERSONAS", "Tu memoria relacional", "Abrí cualquier persona para editar contexto, registrar interacciones, compromisos y oportunidades."],
     network: ["RED", "Una vista, no un ranking", "Los círculos los definís vos. ORBITA no asigna valor humano automáticamente ni convierte vínculos en puntajes."],
-    agenda: ["AGENDA", "Preparación antes que calendario", "Usá Día, Semana o Mes. Cada reunión puede abrir un brief construido solamente con la información que registraste."],
     data: ["DATOS", "Control y portabilidad", "Exportá JSON/CSV/Markdown, auditá el estado, revisá la cuenta y controlá dónde se guarda tu información."]
   };
   const [label,title,body] = guides[topic] || guides.today;
-  drawerContent.innerHTML = `<div class="drawer-head"><button class="icon-btn drawer-close" data-action="close-drawer">${icon("close")}</button><div><span class="eyebrow">AYUDA · ${label}</span><h2>${title}</h2><p>Guía rápida de ORBITA.</p></div></div><div class="drawer-body help-body"><section class="help-lead"><p>${body}</p></section><section class="drawer-section"><span class="eyebrow">LO ESENCIAL</span><div class="help-steps"><div><strong>1</strong><p><b>Capturá.</b> Persona, interacción, compromiso, oportunidad o reunión.</p></div><div><strong>2</strong><p><b>Volvé al contexto.</b> Cada relación reúne su historia completa.</p></div><div><strong>3</strong><p><b>Actuá.</b> Hoy y Agenda te muestran lo que merece atención.</p></div></div></section><section class="drawer-section"><span class="eyebrow">ATAJOS</span><div class="shortcut-list"><div><kbd>⌘/Ctrl K</kbd><span>Buscar personas o crear registros</span></div><div><kbd>ESC</kbd><span>Cerrar paneles y modales</span></div></div></section><section class="drawer-section"><span class="eyebrow">DATOS Y PRIVACIDAD</span><p class="context-copy">En modo local, todo vive en este navegador. Con Supabase configurado, ORBITA sincroniza un workspace por usuario y la base debe tener RLS habilitado. Nunca uses una secret/service key en frontend.</p></section><div class="drawer-footer-actions"><button class="btn btn-primary" data-action="open-capture">${icon("plus")} Capturar algo</button><button class="btn btn-ghost" data-action="start-onboarding">Repetir onboarding</button></div></div>`;
+  drawerContent.innerHTML = `<div class="drawer-head"><button class="icon-btn drawer-close" data-action="close-drawer">${icon("close")}</button><div><span class="eyebrow">AYUDA · ${label}</span><h2>${title}</h2><p>Guía rápida de ORBITA.</p></div></div><div class="drawer-body help-body"><section class="help-lead"><p>${body}</p></section><section class="drawer-section"><span class="eyebrow">LO ESENCIAL</span><div class="help-steps"><div><strong>1</strong><p><b>Capturá.</b> Persona, interacción, compromiso u oportunidad.</p></div><div><strong>2</strong><p><b>Volvé al contexto.</b> Cada relación reúne su historia completa.</p></div><div><strong>3</strong><p><b>Actuá.</b> Hoy y Red te muestran lo que merece atención y qué relaciones pueden ayudarte.</p></div></div></section><section class="drawer-section"><span class="eyebrow">ATAJOS</span><div class="shortcut-list"><div><kbd>⌘/Ctrl K</kbd><span>Buscar personas o crear registros</span></div><div><kbd>ESC</kbd><span>Cerrar paneles y modales</span></div></div></section><section class="drawer-section"><span class="eyebrow">DATOS Y PRIVACIDAD</span><p class="context-copy">Sin una cuenta conectada, tus datos permanecen en este dispositivo. Si activás sincronización, ORBITA mantiene un workspace asociado a tu cuenta.</p></section><div class="drawer-footer-actions"><button class="btn btn-primary" data-action="open-capture">${icon("plus")} Capturar algo</button><button class="btn btn-ghost" data-action="start-onboarding">Repetir onboarding</button></div></div>`;
   openDrawer();
 }
 
 function openAuditDrawer() {
   const audit = auditStore(store);
   const status = audit.ok ? "SALUDABLE" : "REQUIERE ATENCIÓN";
-  drawerContent.innerHTML = `<div class="drawer-head"><button class="icon-btn drawer-close" data-action="close-drawer">${icon("close")}</button><div><span class="eyebrow">AUDITORÍA DEL WORKSPACE</span><h2>${status}</h2><p>${audit.errors} errores · ${audit.warnings} advertencias · ${(audit.sizeBytes/1024).toFixed(1)} KB</p></div></div><div class="drawer-body"><section class="audit-score ${audit.ok?"good":"risk"}"><strong>${audit.ok?"OK":"!"}</strong><div><h3>${audit.ok?"La estructura de datos es consistente.":"Hay referencias o datos que conviene reparar."}</h3><p>La auditoría revisa IDs duplicados, referencias huérfanas, fechas inválidas y tamaño local.</p></div></section><section class="drawer-section"><span class="eyebrow">HALLAZGOS</span>${audit.issues.length?`<div class="audit-list">${audit.issues.map(i=>`<div class="audit-item ${i.severity}"><span>${i.severity==="error"?"ERROR":"AVISO"}</span><p>${esc(i.message)}</p></div>`).join("")}</div>`:`<p class="context-copy">No encontramos problemas estructurales en este workspace.</p>`}</section><div class="drawer-footer-actions">${audit.issues.length?`<button class="btn btn-primary" data-action="repair-store">${icon("refresh")} Reparar automáticamente</button>`:""}<button class="btn btn-ghost" data-action="export-json">${icon("download")} Backup antes de tocar nada</button></div></div>`;
+  drawerContent.innerHTML = `<div class="drawer-head"><button class="icon-btn drawer-close" data-action="close-drawer">${icon("close")}</button><div><span class="eyebrow">AUDITORÍA DEL WORKSPACE</span><h2>${status}</h2><p>${audit.errors} errores · ${audit.warnings} advertencias · ${(audit.sizeBytes/1024).toFixed(1)} KB</p></div></div><div class="drawer-body"><section class="audit-score ${audit.ok?"good":"risk"}"><strong>${audit.ok?"OK":"!"}</strong><div><h3>${audit.ok?"La estructura de datos es consistente.":"Hay referencias o datos que conviene reparar."}</h3><p>La auditoría revisa IDs duplicados, referencias huérfanas, fechas inválidas y tamaño del workspace.</p></div></section><section class="drawer-section"><span class="eyebrow">HALLAZGOS</span>${audit.issues.length?`<div class="audit-list">${audit.issues.map(i=>`<div class="audit-item ${i.severity}"><span>${i.severity==="error"?"ERROR":"AVISO"}</span><p>${esc(i.message)}</p></div>`).join("")}</div>`:`<p class="context-copy">No encontramos problemas estructurales en este workspace.</p>`}</section><div class="drawer-footer-actions">${audit.issues.length?`<button class="btn btn-primary" data-action="repair-store">${icon("refresh")} Reparar automáticamente</button>`:""}<button class="btn btn-ghost" data-action="export-json">${icon("download")} Backup antes de tocar nada</button></div></div>`;
   openDrawer();
 }
 
@@ -906,7 +979,7 @@ async function enterApp(session, { recovery = false } = {}) {
         if (localChangedSinceSync && remoteAdvancedSinceSync) {
           store = local;
           setSyncStatus("error", "CONFLICTO");
-          toast("Detectamos cambios locales y remotos. ORBITA no sobrescribió ninguno automáticamente.", "warn");
+          toast("Detectamos cambios en este dispositivo y en tu cuenta. ORBITA no sobrescribió ninguno automáticamente.", "warn");
         } else if (localChangedSinceSync && !remoteAdvancedSinceSync) {
           store = local;
           scheduleCloudSync();
@@ -972,11 +1045,15 @@ async function bootstrap() {
 async function handleAction(target) {
   const el = target.closest("[data-action],[data-route]");
   if (!el) return;
-  if (el.dataset.route) { go(el.dataset.route); return; }
+  if (el.dataset.route) { if (el.dataset.route === "network" && (store.profile.currentGoal || "").trim()) ui.networkMode = "goal"; go(el.dataset.route); return; }
   const action = el.dataset.action;
   const id = el.dataset.id;
   if (action === "auth-view") showAuth(el.dataset.value || "login");
   else if (action === "auth-local") { authSession = useLocalMode(); await enterApp(authSession); }
+  else if (action === "focus-goal") { const input=document.querySelector("#relational-goal-input"); input?.focus(); input?.select(); }
+  else if (action === "open-goal-network") { ui.networkMode="goal"; go("network"); renderCurrentRoute(); }
+  else if (action === "define-goal") { ui.networkMode="goal"; go("today"); renderCurrentRoute(); setTimeout(()=>{ const input=document.querySelector("#relational-goal-input"); input?.focus(); input?.select(); },40); }
+  else if (action === "goal-example") { const field=document.querySelector('#onboarding-goal-form textarea[name="goal"]'); if(field){ field.value=el.dataset.value||""; field.focus(); } }
   else if (action === "onboarding-next") showOnboarding(ui.onboardingStep + 1);
   else if (action === "onboarding-back") showOnboarding(ui.onboardingStep - 1);
   else if (action === "onboarding-finish") finishOnboarding(el.dataset.value || "keep");
@@ -988,15 +1065,20 @@ async function handleAction(target) {
   else if (action === "sign-out") { if (authSession?.mode === "cloud") await syncNow({ quiet: true }); await signOut(); authSession = null; cloudRevision = null; closeDrawer(); closeModal(); closeCommand(); showAuth("login"); }
   else if (action === "delete-account") openDeleteAccountModal();
   else if (action === "open-capture") openCapture();
-  else if (action === "capture-kind") openEntityForm(el.dataset.kind, "", el.dataset.personId || ui.capturePersonId || "");
+  else if (action === "capture-kind") {
+    const draft=document.querySelector("#capture-draft")?.value.trim()||"";
+    ui.captureDraft=draft;
+    const kind=el.dataset.kind;
+    openEntityForm(kind, "", el.dataset.personId || ui.capturePersonId || "");
+    applyCaptureDraft(kind,draft);
+    ui.captureDraft="";
+  }
   else if (action === "capture-for-person") openCapture(id);
   else if (action === "open-person") openPersonDrawer(id);
   else if (action === "edit-person") openEntityForm("person", id);
   else if (action === "edit-interaction") openEntityForm("interaction", id);
   else if (action === "edit-commitment") openEntityForm("commitment", id);
   else if (action === "edit-opportunity") openEntityForm("opportunity", id);
-  else if (action === "edit-meeting") openEntityForm("meeting", id);
-  else if (action === "brief-meeting") openMeetingBrief(id);
   else if (action === "agent-opportunity") openAgentOpportunity(id);
   else if (action === "close-drawer") closeDrawer();
   else if (action === "close-modal") closeModal();
@@ -1006,15 +1088,11 @@ async function handleAction(target) {
   else if (action === "toggle-commitment") {
     const c = store.commitments.find(x => x.id === id); if (!c) return; c.status = c.status === "done" ? "open" : "done"; saveStore(c.status === "done" ? "Compromiso completado" : "Compromiso reabierto"); if (drawerShell.classList.contains("open")) openPersonDrawer(c.personId);
   }
-  else if (action === "done-meeting") { const m = store.meetings.find(x=>x.id===id); if (!m) return; m.status="done"; closeDrawer(); saveStore("Reunión marcada como realizada"); }
   else if (action === "people-filter") { ui.circleFilter = el.dataset.value; renderCurrentRoute(); }
   else if (action === "network-filter") { ui.networkFilter = el.dataset.value; renderCurrentRoute(); }
+  else if (action === "network-mode") { ui.networkMode = el.dataset.value === "goal" ? "goal" : "all"; renderCurrentRoute(); }
   else if (action === "cycle-network-filter") { const opts=["Todos","Cercano","Estratégico","Activo","Nuevo"]; ui.networkFilter=opts[(opts.indexOf(ui.networkFilter)+1)%opts.length]; renderCurrentRoute(); }
-  else if (action === "agenda-mode") { ui.agendaMode=el.dataset.value||"week"; renderCurrentRoute(); }
-  else if (action === "agenda-select-date") { ui.agendaAnchor=el.dataset.value||ui.agendaAnchor; ui.agendaMode="day"; renderCurrentRoute(); }
-  else if (action === "agenda-today") { ui.agendaAnchor=new Date().toISOString().slice(0,10); renderCurrentRoute(); }
-  else if (action === "agenda-nav") { const d=agendaDate(); const dir=Number(el.dataset.value||1); if(ui.agendaMode==="month")d.setMonth(d.getMonth()+dir); else d.setDate(d.getDate()+dir*(ui.agendaMode==="week"?7:1)); ui.agendaAnchor=dateKey(d); renderCurrentRoute(); }
-  else if (action === "open-opportunities") { ui.dataTab="connections"; go("data"); renderCurrentRoute(); }
+  else if (action === "open-opportunities") { go("today"); renderCurrentRoute(); }
   else if (action === "data-tab") { ui.dataTab=el.dataset.value||"summary"; renderCurrentRoute(); }
   else if (action === "import-csv") importCsvFile.click();
   else if (action === "export-json") { downloadText(`orbita-backup-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(store,null,2), "application/json"); toast("Backup descargado"); }
@@ -1045,6 +1123,7 @@ document.addEventListener("submit", async event => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(form).entries());
     store.profile.currentGoal = String(data.goal || "").trim().slice(0, 280);
+    if (store.profile.currentGoal) ui.networkMode = "goal";
     saveStore(store.profile.currentGoal ? "Red analizada" : "Objetivo limpiado");
     return;
   }
@@ -1113,11 +1192,13 @@ document.addEventListener("submit", async event => {
     store.profile = { ...store.profile, name: String(data.name).trim() || "Mi espacio", role: String(data.role || "").trim(), focus: String(data.focus || "").trim() };
     showOnboarding(2); return;
   }
-  if (form.id === "onboarding-goals-form") {
+  if (form.id === "onboarding-goal-form") {
     event.preventDefault();
-    const fd = new FormData(form);
-    store.profile = { ...store.profile, goals: fd.getAll("goals").map(String), defaultCadenceDays: Number(fd.get("defaultCadenceDays") || 30) };
-    showOnboarding(3); return;
+    const data = Object.fromEntries(new FormData(form).entries());
+    store.profile = { ...store.profile, currentGoal: String(data.goal || "").trim().slice(0,280) };
+    if (store.profile.currentGoal) ui.networkMode = "goal";
+    finishOnboarding(store.people.length ? "keep" : "empty");
+    return;
   }
 });
 

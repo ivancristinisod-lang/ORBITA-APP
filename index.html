@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#070807" />
-  <meta name="description" content="ORBITA — inteligencia relacional para fundadores y emprendedores." />
+  <meta name="description" content="ORBITA — inteligencia relacional explicable para entender y activar la red que ya construiste." />
   <title>ORBITA — Inteligencia Relacional</title>
   <link rel="icon" href="/assets/orbita-logo.png" type="image/png" />
   <link rel="stylesheet" href="/styles.css" />
@@ -23,13 +23,12 @@
         <button class="nav-item" data-route="today"><span data-icon="home"></span><span>HOY</span><span class="nav-badge" id="today-badge"></span></button>
         <button class="nav-item" data-route="people"><span data-icon="people"></span><span>PERSONAS</span></button>
         <button class="nav-item" data-route="network"><span data-icon="network"></span><span>RED</span></button>
-        <button class="nav-item" data-route="agenda"><span data-icon="calendar"></span><span>AGENDA</span></button>
         <button class="nav-item" data-route="data"><span data-icon="database"></span><span>DATOS</span></button>
       </nav>
       <div class="sidebar-spacer"></div>
       <button class="sidebar-capture" data-action="open-capture"><span data-icon="plus"></span><span>CAPTURAR</span></button>
       <button class="sidebar-help" data-action="open-help"><span class="help-dot">?</span><span><strong>AYUDA</strong><small>Guía y atajos</small></span></button>
-      <div class="sync-chip" id="sync-chip" title="Estado de guardado"><span class="sync-dot"></span><span id="sync-label">LOCAL</span></div>
+      <div class="sync-chip" id="sync-chip" title="Estado de guardado"><span class="sync-dot"></span><span id="sync-label">EN ESTE DISPOSITIVO</span></div>
       <button class="user-chip" data-action="edit-profile"><span class="mini-avatar">TÚ</span><span><strong id="profile-name">Mi espacio</strong><small id="profile-role">Founder</small></span></button>
     </aside>
     <header class="mobile-topbar">
@@ -42,7 +41,7 @@
     <div class="mobile-scrim" id="mobile-scrim"></div>
     <div class="drawer-shell" id="drawer-shell" aria-hidden="true"><div class="drawer-scrim" data-action="close-drawer"></div><aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Detalle"><div id="drawer-content"></div></aside></div>
     <div class="modal-shell" id="modal-shell" aria-hidden="true"><div class="modal-scrim" data-action="close-modal"></div><section class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Formulario"><div id="modal-content"></div></section></div>
-    <div class="command-shell" id="command-shell" aria-hidden="true"><div class="command-scrim" data-action="close-command"></div><section class="command" role="dialog" aria-modal="true" aria-label="Buscar en ORBITA"><div class="command-input-wrap"><span data-icon="search"></span><input id="command-input" autocomplete="off" placeholder="Persona, empresa, nota o acción…" /><kbd>ESC</kbd></div><div class="command-results" id="command-results"></div></section></div>
+    <div class="command-shell" id="command-shell" aria-hidden="true"><div class="command-scrim" data-action="close-command"></div><section class="command" role="dialog" aria-modal="true" aria-label="Buscar en ORBITA"><div class="command-input-wrap"><span data-icon="search"></span><input id="command-input" autocomplete="off" placeholder="Buscar personas, empresas, contexto o acción…" /><kbd>ESC</kbd></div><div class="command-results" id="command-results"></div></section></div>
     <input type="file" id="import-file" accept="application/json,.json" hidden />
     <input type="file" id="import-csv-file" accept="text/csv,.csv" hidden />
     <div class="toast-stack" id="toast-stack" aria-live="polite"></div>

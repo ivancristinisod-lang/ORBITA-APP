@@ -1,38 +1,65 @@
-# ORBITA — Design System 0.1
+# ORBITA — Design System 0.6.1
 
-## Objetivo visual
+## Product expression
 
-La interfaz debe ser:
+ORBITA debe sentirse premium, editorial, tecnológico y humano. La interfaz prioriza comprensión y confianza sobre densidad visual.
 
-- fácil de escanear;
-- compacta sin ser pequeña;
-- silenciosa;
-- espacial sin caer en estética sci-fi genérica;
-- humana;
-- orientada a contexto.
+## Product hierarchy
 
-## Escala
+**OBJETIVO → RED → EVIDENCIA → OPORTUNIDAD → ACCIÓN**
 
-La maqueta evita componentes gigantes. El tamaño medio permite leer dashboard, relaciones y señales en una sola vista.
+En HOY:
 
-## Jerarquía
+**OBJETIVO → OPORTUNIDADES → NECESITA TU ATENCIÓN → MEMORIA RELACIONAL**
 
-1. Acción o señal importante.
-2. Persona.
-3. Contexto.
-4. Metadatos.
-5. Acciones secundarias.
+## Navigation
 
-## Lenguaje visual
+Solo cuatro superficies principales:
 
-- Fondo oscuro de baja fatiga.
-- Bordes finos y capas contenidas.
-- Acentos fríos para inteligencia y conexión.
-- Acentos cálidos reservados para riesgo/atención.
-- Uso de órbitas y nodos solamente donde agregan significado.
+**HOY / PERSONAS / RED / DATOS**
 
-## Principio de producto
+Agenda no forma parte del MVP V0.6.1.
 
-**No convertir relaciones humanas en un videojuego.**
+## Palette
 
-Scores en esta demo son placeholders para visualizar densidad de información. La versión real debería estudiar cuándo mostrar lenguaje cualitativo en lugar de números.
+- Background: `#070807`
+- Surface 1: `#0D0F0D`
+- Surface 2: `#121411`
+- Surface 3: `#181A16`
+- Border: `#292C25`
+- Acid: `#DCFF00` — acción / selección
+- Cobalt: `#2747FF` — inteligencia / inferencia
+- Ivory: `#E9DFCB` — evidencia / lectura humana
+- Alert: `#FF5738` — riesgo real
+- Healthy: `#62B36D` — estado saludable
+
+## Evidence semantics
+
+- **HECHO:** ivory / neutral.
+- **INFERENCIA:** cobalt.
+- **ACCIÓN:** acid.
+- **RIESGO:** alert.
+
+Una inferencia nunca se presenta como hecho.
+
+## RED
+
+RED es goal-first. Con objetivo, el objetivo actual domina, las relaciones relevantes se destacan y las irrelevantes se atenúan. No se inventan edges.
+
+La **RED COMPLETA** se conserva como vista secundaria. Sin objetivo se muestra un empty state con **DEFINIR OBJETIVO** y fallback **VER RED COMPLETA**.
+
+## PERSONAS
+
+La fila completa debe ser semánticamente interactiva y accesible. Evitar pseudo-buttons y nested interactive controls inválidos.
+
+El detalle mantiene: **AHORA → CONTEXTO → COMPROMISOS → OPORTUNIDADES → HISTORIA**. Meetings legacy no se muestran.
+
+## Motion
+
+Motion explica orientación o cambio de estado. Sin partículas, glow permanente ni WebGL ornamental. Respetar `prefers-reduced-motion`.
+
+## Principle
+
+**Las personas no son leads y una relación no es un score.**
+
+La relevancia contextual existe para una tarea concreta; no mide el valor de una persona.

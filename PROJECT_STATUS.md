@@ -1,80 +1,72 @@
 # ORBITA — Project Status
 
-**Product generation:** V0.5  
-**Patch:** 0.5.2 — Local Alpha Stage Gate  
-**Stage:** Productized High-Fidelity Prototype → Functional Alpha / Pre-MVP  
+**Product generation:** V0.6  
+**Patch:** 0.6.1 — Product Simplification  
+**Stage:** Functional Alpha / Pre-MVP → Experience validation  
 **Frontend:** Vercel  
 **Backend-ready:** Supabase ORBITA (`sa-east-1`), desacoplado hasta activación  
 **Primary user:** founders / entrepreneurs
 
-## Producto utilizable hoy
+## V0.6.1 — producto activo
 
-- [x] 5 rutas canónicas: Hoy, Personas, Red, Agenda, Datos
-- [x] CRUD manual de personas, interacciones, compromisos, oportunidades y reuniones
-- [x] dataset demo de 16 relaciones
-- [x] Meeting Brief factual
-- [x] Agenda Día / Semana / Mes
+- [x] 4 rutas canónicas: Hoy, Personas, Red, Datos
+- [x] Agenda removida de navegación y superficie activa
+- [x] Meeting Brief removido de la UI
+- [x] creación/edición de meetings removida de la UI
+- [x] meetings históricos preservados a nivel de store para compatibilidad
+- [x] lenguaje visible “LOCAL” retirado como branding
+- [x] RED abre por objetivo cuando existe `currentGoal`
+- [x] HOY → RED activa explícitamente modo goal
+- [x] RED completa preservada como vista secundaria
+- [x] empty state fuerte cuando no existe objetivo
+- [x] PERSONAS con filas semánticas accesibles
+- [x] objetivo → evidencia → oportunidad → acción preservado
+- [x] CRUD de personas, interacciones, compromisos y oportunidades
 - [x] import/export JSON / CSV / Markdown
-- [x] onboarding y ayuda contextual
-- [x] búsqueda / command palette
-- [x] responsive UI
-- [x] persistencia local
-- [x] entrada funcional sin backend
+- [x] persistencia y compatibilidad histórica
+- [x] onboarding goal-first
+- [x] responsive + reduced motion
+
+## Legacy compatibility
+
+`meetings[]` puede seguir existiendo en workspaces y backups anteriores.
+
+**Legacy compatibility — not an active V0.6.1 product surface.**
+
+No se realiza una migración destructiva para borrar esos datos.
 
 ## Backend preparado, no bloqueante
 
-- [x] proyecto Supabase dedicado en São Paulo
-- [x] cliente de Email/Password Auth preparado
-- [x] workspace cloud por usuario preparado
-- [x] cache local por usuario preparada
+- [x] Supabase Auth adapter
+- [x] workspace cloud por usuario
+- [x] cache por usuario
 - [x] RLS + FORCE RLS
-- [x] acceso anónimo DB revocado
-- [x] control de concurrencia / revision server-side
-- [x] Edge Function autenticada para eliminación de cuenta
-- [x] migraciones versionadas
-- [x] Security Advisor: 0 findings en última auditoría
-- [x] Performance Advisor: 0 findings en última auditoría
-
-## Stage Gate V0.5
-
-ORBITA corre por defecto como **LOCAL ALPHA**. Variables parciales de backend no pueden romper el deploy.
-
-Cloud se activa solamente con:
-
-`ORBITA_ENABLE_CLOUD=true`
-
-junto a URL + publishable key válidas.
-
-## Gate antes de activar Cloud Alpha
-
-- [ ] Site URL / Redirect URL exactas
-- [ ] confirmación de email
-- [ ] política de contraseña server-side
-- [ ] signup/login/recovery E2E
-- [ ] test real con 2 usuarios
-- [ ] sync entre 2 dispositivos
-- [ ] logout/login sin pérdida de datos
+- [x] optimistic concurrency
+- [x] eliminación de cuenta server-side
 
 ## Gate antes de beta pública
 
+- [ ] cloud activation QA real con dos usuarios
+- [ ] sync entre dispositivos
 - [ ] custom SMTP
 - [ ] CAPTCHA / Turnstile
 - [ ] MFA/2FA administrativa
-- [ ] rate-limit review
 - [ ] Privacy Policy / Terms / retention
 - [ ] dominio productivo propio
 - [ ] analytics de activación/retención
 
 ## Intencionalmente diferido
 
+- Calendar product surface
 - OAuth social
 - Gmail / Calendar / LinkedIn / WhatsApp ingestion
-- AI recommendations
-- equipos/shared workspaces
-- vector DB / graph DB
+- outreach automation
+- AI API externa
+- graph/vector DB
+- equipos colaborativos
 - billing
 - Realtime
 
 ## Prioridad #1
 
-**Usar ORBITA como producto funcional, terminar convergencia UX y preparar la primera prueba real con usuarios antes de ampliar el scope.**
+**Validar si ORBITA ayuda a entender qué quiero lograr y qué relaciones de mi red pueden moverme hacia ese objetivo.**

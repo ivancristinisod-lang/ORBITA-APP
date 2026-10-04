@@ -2,42 +2,49 @@
 
 ORBITA es un agente de inteligencia relacional para founders y emprendedores.
 
-Convierte un objetivo actual + el contexto de tu red en oportunidades priorizadas, explicables y accionables:
+Convierte un objetivo actual + el contexto registrado de tu red en oportunidades priorizadas, explicables y accionables:
 
 **OBJETIVO → RED → EVIDENCIA → OPORTUNIDAD → ACCIÓN**
 
 ## Estado actual
 
-**Versión:** V0.5.2 Functional Alpha  
+**Versión:** V0.6.1 Product Simplification Patch  
 **Arquitectura:** local-first, backend-ready  
 **Deploy:** Vercel  
 **Producción:** https://orbita-app-kappa.vercel.app
 
-### Producto
-- HOY — señales, objetivo actual y agente relacional.
-- PERSONAS — relaciones, historial y CRUD.
-- RED — mapa/círculos relacionales.
-- AGENDA — Día / Semana / Mes + Meeting Brief.
-- DATOS — actividad, oportunidades, import/export, auditoría y configuración.
-- Ranking relacional explicable con separación entre hechos e inferencias.
-- Protección contra falsos positivos.
-- Persistencia local.
-- Supabase Auth + cloud sync preparados detrás de stage gate.
-- Adaptador Solana privacy-minimal en `solana.js`; wallet/firma/broadcast todavía no forman parte del estado productivo.
+## Producto
 
-## Desarrollo local
+ORBITA tiene **4 superficies canónicas**:
+
+1. **HOY** — objetivo actual, oportunidades explicables y señales que requieren atención.
+2. **PERSONAS** — relaciones, contexto, compromisos, oportunidades e historia.
+3. **RED** — abre por objetivo cuando existe uno; la red completa queda como vista secundaria.
+4. **DATOS** — información, sistema, cuenta, import/export y herramientas avanzadas.
+
+### V0.6.1
+- Agenda deja de formar parte del MVP.
+- No se pueden crear reuniones nuevas desde la UI.
+- Meeting Brief deja de existir como superficie visible.
+- `meetings[]` se conserva en el schema/store únicamente por compatibilidad histórica.
+- La interfaz deja de usar “LOCAL” como branding de producto.
+- RED es goal-first.
+- “Mi red” completa sigue disponible como fallback secundario.
+- CAPTURAR conserva persona, interacción, compromiso y oportunidad.
+- Ranking relacional mantiene separación entre evidencia, inferencia y acción.
+
+## Compatibilidad histórica
+
+**Legacy compatibility — not an active V0.6.1 product surface.**
+
+Backups anteriores pueden contener `meetings: [...]`. ORBITA sigue pudiendo cargar, normalizar, importar y exportar esos datos para evitar pérdida destructiva, pero no los presenta como feature activa ni permite crear reuniones nuevas desde la interfaz.
+
+## Desarrollo
 
 Requiere Node 22–24. CI y deploy usan Node 24.
 
 ```bash
 npm run dev
-```
-
-Abrí `http://localhost:4173`.
-
-Validación completa:
-
-```bash
 npm run validate
 ```
 
@@ -47,13 +54,11 @@ npm run validate
 npm run build → dist/
 ```
 
-Vercel construye desde `main`.
+Vercel construye desde `main` para producción. Las branches/PRs generan previews.
 
 ## Cloud stage gate
 
-ORBITA funciona sin backend como **LOCAL ALPHA**.
-
-Cloud solo se activa cuando:
+La arquitectura sigue siendo local-first y el cloud permanece detrás de un stage gate técnico.
 
 ```text
 ORBITA_ENABLE_CLOUD=true
@@ -64,44 +69,13 @@ ORBITA_APP_URL=https://orbita-app-kappa.vercel.app
 
 Nunca exponer `sb_secret_*` ni `service_role` en browser.
 
-## Estructura
+## Documentación
 
-```text
-/
-├─ index.html
-├─ app.js
-├─ core.js
-├─ seed.js
-├─ auth.js
-├─ cloud.js
-├─ solana.js
-├─ styles.css
-├─ build.mjs
-├─ check.mjs
-├─ tests.mjs
-├─ .github/workflows/validate.yml
-├─ supabase/
-│  ├─ schema.sql
-│  ├─ migrations/
-│  └─ functions/delete-account/index.ts
-└─ docs/
-   └─ archive/
-```
-
-### Supabase source of truth
-- Fresh install: `supabase/schema.sql`
-- Historial aplicado: `supabase/migrations/`
-- Operación privilegiada: `supabase/functions/delete-account/index.ts`
-
-### Documentación
-Los documentos vigentes permanecen en raíz para acceso rápido. Versiones históricas/superseded viven en `docs/archive/`.
-
-## Seguridad
-
-Ver:
+- `ORBITA_V0.6_EXPERIENCE.md`
+- `DESIGN-SYSTEM.md`
+- `PROJECT_STATUS.md`
+- `ARCHITECTURE.md`
 - `SECURITY.md`
-- `AUDIT-REPORT-V0.5.md`
 - `AUTH-SETUP.md`
-- `ARCHITECTURE-DECISIONS.md`
 
-Regla no negociable: una operación privilegiada nunca se resuelve moviendo credenciales administrativas al navegador.
+La infraestructura técnica puede seguir describiéndose como local-first; esa implementación no se usa como branding visible del producto.

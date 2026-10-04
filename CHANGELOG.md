@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.6.1 — Product simplification patch
+
+- Removed Agenda from the active product navigation and frontend surface.
+- Removed Meeting Brief, meeting capture/edit handlers and meeting-specific presentation code.
+- Preserved `meetings[]` only for legacy workspace/backups compatibility; no destructive migration.
+- Removed implementation-facing “LOCAL” language from product branding and entry UI.
+- Made RED goal-first when a current goal exists.
+- Added a dedicated HOY → RED goal-mode action and a no-goal empty state.
+- Preserved full-network exploration as a secondary fallback.
+- Renamed the secondary opportunity CTA from PREPARAR ACCIÓN to ABRIR RELACIÓN.
+- Replaced PERSONAS pseudo-button rows with semantic accessible buttons.
+- Updated checks to enforce exactly four canonical routes and the V0.6.1 product contract.
+- Removed dead Agenda/meeting presentation CSS.
+## 0.6.0 — Relational experience upgrade
+
+- Rebuilt HOY around the current goal, explainable ranking and a prioritized attention queue.
+- Made the #1 opportunity visually dominant while preserving deterministic ranking and false-positive protection.
+- Reworked the evidence drawer so factual evidence, inference and next action have explicit semantic separation.
+- Simplified PERSONAS into a scannable relationship list and moved edit mechanics into secondary detail flows.
+- Rebuilt person detail as a longitudinal relationship story: Ahora → Contexto → Compromisos → Oportunidades → Historia.
+- Added RED modes “Mi red” and “Por objetivo”; irrelevant nodes are visually de-emphasized without inventing graph edges.
+- Reframed AGENDA as relational preparation first, calendar second; mobile is list-first.
+- Simplified DATOS into Mi información, Sistema, Cuenta and Avanzado.
+- Reworked CAPTURAR around the prompt “¿Qué pasó?” while keeping existing structured CRUD.
+- Reduced onboarding to promise → identity → current goal.
+- Added the V0.6 editorial visual system, responsive composition and reduced-motion handling.
+- Kept core relational logic, persistence, auth/cloud architecture and Solana scope unchanged.
+- Added V0.6 validation assertions and dedicated experience documentation.
+
 ## 0.5.2 — Local Alpha stage gate
 
 - Default runtime is now LOCAL ALPHA; incomplete backend configuration can no longer break production.
