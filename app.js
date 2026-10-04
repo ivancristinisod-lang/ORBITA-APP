@@ -488,7 +488,7 @@ function networkView(){
         <div class="network-legend">${circles.map(c=>`<span class="legend-${c.toLowerCase().replaceAll("é","e")}"><i></i>${esc(c)}</span>`).join("")}</div>
       </section>
       <aside class="network-intelligence">
-        <div><span class="eyebrow">${ui.networkMode==="goal"?"RELEVANCIA CONTEXTUAL":"LECTURA DE RED"}</span><h2>${ui.networkMode==="goal"?"Relaciones que sostienen tu objetivo":"${store.people.length} relaciones registradas"}</h2></div>
+        <div><span class="eyebrow">${ui.networkMode==="goal"?"RELEVANCIA CONTEXTUAL":"LECTURA DE RED"}</span><h2>${ui.networkMode==="goal"?"Relaciones que sostienen tu objetivo":`${store.people.length} relaciones registradas`}</h2></div>
         ${ui.networkMode==="goal" ? (ranked.length?`<div class="network-ranked-mini">${ranked.slice(0,5).map((item,index)=>{const p=personById(store,item.contact_id);return p?`<button data-action="agent-opportunity" data-id="${esc(p.id)}"><span>0${index+1}</span><div><strong>${esc(p.name)}</strong><small>${esc(item.reason)}</small></div><b>${item.relevance_score}</b></button>`:""}).join("")}</div>`:`<p class="muted-copy">No hay relaciones con evidencia suficiente para este objetivo.</p>`) :
         `<div class="network-readout"><div><strong>${new Set(store.people.map(p=>p.company).filter(Boolean)).size}</strong><span>organizaciones</span></div><div><strong>${store.people.filter(p=>["Cercano","Estratégico"].includes(p.circle)).length}</strong><span>relaciones cercanas / estratégicas</span></div><div><strong>${computeSignals(store).length}</strong><span>señales activas</span></div></div><div class="topics-block"><span class="eyebrow">TEMAS PRESENTES</span><div class="topic-chips">${tags.map(t=>`<span class="topic-chip">${esc(t.name)} · ${t.count}</span>`).join("")||`<span class="muted-copy">Todavía no hay tags.</span>`}</div></div>`}
         <p class="network-trust-note">La prominencia visual representa contexto y relevancia para una tarea; no el valor de una persona.</p>
@@ -1137,11 +1137,12 @@ async function handleAction(target) {
   else if (action === "delete-account") openDeleteAccountModal();
   else if (action === "open-capture") openCapture();
   else if (action === "capture-kind") {
-    const draft=document.querySelector("#capture-draft")?.value.trim()||ui.captureDraft||"";
+    const draft=document.querySelector("#capture-draft")?.value.trim()||"";
     ui.captureDraft=draft;
     const kind=el.dataset.kind;
     openEntityForm(kind, "", el.dataset.personId || ui.capturePersonId || "");
     applyCaptureDraft(kind,draft);
+    ui.captureDraft="";
   }
   else if (action === "capture-for-person") openCapture(id);
   else if (action === "open-person") openPersonDrawer(id);
