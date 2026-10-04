@@ -1,7 +1,7 @@
-# ORBITA — Security Baseline V0.5.1
+# ORBITA — Security Baseline (current product V0.6.1)
 
-**Product generation:** V0.5  
-**Security patch:** 0.5.1  
+**Current product:** V0.6.1  
+**Security baseline introduced:** 0.5.1  
 **Supabase region:** São Paulo (`sa-east-1`)  
 **Principle:** relational data is sensitive by default. Security and portability are product requirements, not cleanup work.
 
@@ -57,7 +57,7 @@
 - Four owner-scoped RLS policies verified.
 - Migration history is stored under `supabase/migrations/`.
 
-## Known security boundary in V0.5
+## Known security boundary carried into V0.6.1
 
 ### Auth tokens currently use localStorage
 

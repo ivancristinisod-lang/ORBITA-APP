@@ -78,3 +78,72 @@ test("Solana attestation adapter is deterministic and privacy-minimal",async()=>
   assert.doesNotMatch(memo,/ivan|email|phone|goal|note/i);
   assert.equal(solanaExplorerUrl("demoSignature"),"https://explorer.solana.com/tx/demoSignature?cluster=devnet");
 });
+
+
+test("normalization survives malformed collection entries and invalid numbers",()=>{
+  const normalized=normalizeStore({
+    profile:{defaultCadenceDays:"not-a-number"},
+    people:[null,42,{id:101,name:"Ana",cadenceDays:"bad",tags:["IA",null,7]}],
+    interactions:[null,{id:201,personId:101,title:"Hola",date:"2026-10-04T12:00:00Z"}],
+    commitments:[false,{id:301,personId:101,title:"Enviar deck"}],
+    opportunities:["bad",{id:401,personId:101,title:"Intro",stage:"Activa"}],
+    meetings:[null,{id:501,personId:101,title:"Legacy",start:"2026-10-05T12:00:00Z",durationMin:"bad"}]
+  });
+  assert.equal(normalized.profile.defaultCadenceDays,30);
+  assert.equal(normalized.people.length,1);
+  assert.equal(normalized.people[0].id,"101");
+  assert.equal(normalized.people[0].cadenceDays,30);
+  assert.deepEqual(normalized.people[0].tags,["IA","7"]);
+  assert.equal(normalized.interactions[0].personId,"101");
+  assert.equal(normalized.commitments[0].personId,"101");
+  assert.equal(normalized.opportunities[0].personId,"101");
+  assert.equal(normalized.meetings[0].personId,"101");
+  assert.equal(normalized.meetings[0].durationMin,30);
+});
+
+test("CSV export neutralizes spreadsheet formulas even after leading whitespace",()=>{
+  const dangerous=normalizeStore({
+    people:[{id:"p1",name:"\t=CMD|x",role:" @SUM(1+1)",company:"+1+1",circle:"Activo"}]
+  });
+  const csv=peopleToCSV(dangerous);
+  assert.match(csv,/'=CMD\|x/);
+  assert.match(csv,/' @SUM\(1\+1\)/);
+  assert.match(csv,/"?'\+1\+1"?/);
+});
+
+test("Markdown report keeps legacy meetings out of the active product report",()=>{
+  const md=reportToMarkdown(base,fixedNow);
+  assert.doesNotMatch(md,/Reuniones próximas/i);
+  assert.match(md,/Ana Test/);
+});
+
+
+test("relational evidence attributes the actual supporting source",()=>{
+  const crafted=normalizeStore({
+    people:[{id:"p1",name:"Alex",role:"Founder",company:"Studio",circle:"Estratégico",relation:"Nos conocemos por comunidad",tags:["Producto"],cadenceDays:30}],
+    interactions:[{id:"i1",personId:"p1",date:"2026-10-03T12:00:00Z",type:"Mensaje",title:"Charlamos",notes:"Me contó que trabaja con un investor interesado en startups."}],
+    commitments:[],
+    opportunities:[],
+    meetings:[]
+  });
+  const [result]=buildRelationalOpportunities(crafted,"Estoy levantando una ronda pre-seed",new Date("2026-10-04T12:00:00Z"));
+  assert.ok(result);
+  assert.ok(result.evidence.some(item=>item.source==="interacción"&&/investor/i.test(item.text)));
+  assert.equal(result.evidence.some(item=>item.source==="perfil"&&/señales directas vinculadas/i.test(item.text)),false);
+});
+
+
+test("invalid interaction dates fail safely without NaN relationship signals",()=>{
+  const broken=normalizeStore({
+    people:[{id:"p1",name:"Ana",cadenceDays:30}],
+    interactions:[{id:"i1",personId:"p1",date:"not-a-date",title:"Registro"}]
+  });
+  const rel=relationshipState(broken,broken.people[0],fixedNow);
+  assert.equal(rel.label,"Revisar historial");
+  assert.equal(rel.tone,"warn");
+  assert.equal(rel.days,null);
+  const signal=computeSignals(broken,fixedNow).find(item=>item.type==="relationship");
+  assert.ok(signal);
+  assert.doesNotMatch(signal.body,/NaN/);
+  assert.match(signal.body,/fecha inválida/i);
+});

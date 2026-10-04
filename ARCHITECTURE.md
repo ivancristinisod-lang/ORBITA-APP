@@ -2,7 +2,7 @@
 
 ## Estado actual
 
-ORBITA V0.5.2 es una aplicación web estática **local-first** con una capa cloud opcional y explícitamente gated.
+ORBITA V0.6.1 es una aplicación web estática **local-first** con una capa cloud opcional y explícitamente gated.
 
 El core de producto funciona sin backend. Supabase agrega identidad y sincronización por usuario cuando se habilita deliberadamente.
 
