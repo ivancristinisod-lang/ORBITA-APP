@@ -137,6 +137,7 @@ async function activateForCloudUser() {
     if (!userId) {
       activeUserId = "";
       activeSession = null;
+      document.querySelector("#alpha-feedback-entry")?.remove();
       return;
     }
     activeSession = session;
