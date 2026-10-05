@@ -201,6 +201,30 @@ create trigger orbita_link_private_alpha_user
 after insert on auth.users
 for each row execute function private.orbita_link_private_alpha_user();
 
+-- Keep the research-level tester row, but make account deletion erase product data.
+-- orbita_workspaces, funnel events and feedback are deleted/unlinked through their FKs.
+create or replace function private.orbita_mark_tester_inactive_before_auth_delete()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update public.orbita_tester_registry
+     set status = 'inactive',
+         updated_at = pg_catalog.now()
+   where auth_user_id = old.id;
+  return old;
+end;
+$$;
+
+revoke all on function private.orbita_mark_tester_inactive_before_auth_delete() from public, anon, authenticated;
+
+drop trigger if exists orbita_mark_tester_inactive_before_auth_delete on auth.users;
+create trigger orbita_mark_tester_inactive_before_auth_delete
+before delete on auth.users
+for each row execute function private.orbita_mark_tester_inactive_before_auth_delete();
+
 create or replace function private.orbita_tester_registry_timestamps()
 returns trigger
 language plpgsql
