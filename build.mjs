@@ -3,14 +3,14 @@ import path from "node:path";
 
 const root = process.cwd();
 const out = path.join(root, "dist");
-const publicFiles = ["index.html", "styles.css", "app.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "solana.js", "404.html"];
+const publicFiles = ["index.html", "styles.css", "alpha.css", "app.js", "alpha.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "solana.js", "404.html"];
 
 for (const file of [...publicFiles, "orbita-mark.svg", "orbita-logo.png"]) await access(path.join(root, file));
 
 function validateCloudEnv() {
-  // V0.5 stage gate:
-  // ORBITA remains a fully usable local-first Functional Alpha until cloud is
-  // explicitly enabled. Partial env configuration must never break production.
+  // V0.7 Private Alpha stage gate:
+  // ORBITA remains usable local-first until cloud is explicitly enabled.
+  // Partial environment configuration must never silently enable cloud.
   const enableCloud = String(process.env.ORBITA_ENABLE_CLOUD || "").toLowerCase() === "true";
   const url = process.env.ORBITA_SUPABASE_URL || "";
   const key = process.env.ORBITA_SUPABASE_PUBLISHABLE_KEY || "";
@@ -23,7 +23,7 @@ function validateCloudEnv() {
   if (!enableCloud) {
     const supplied = [url, key, explicitAppUrl].filter(Boolean).length;
     if (supplied > 0) {
-      console.warn("ORBITA cloud variables are present but cloud is intentionally disabled. Running LOCAL ALPHA. Set ORBITA_ENABLE_CLOUD=true only when backend integration is ready for QA.");
+      console.warn("ORBITA cloud variables are present but cloud is intentionally disabled. Running LOCAL ALPHA. Set ORBITA_ENABLE_CLOUD=true only when Private Alpha backend QA is ready.");
     }
     return { configured: false, url: "", key: "", appUrl: "" };
   }
@@ -74,11 +74,11 @@ for (const [placeholder, value] of Object.entries(replacements)) {
 await writeFile(path.join(out, "config.js"), config);
 
 const html = await readFile(path.join(out, "index.html"), "utf8");
-if (!html.includes("ORBITA") || !html.includes('id="view-root"') || !html.includes('id="auth-shell"')) {
+if (!html.includes("ORBITA") || !html.includes('id="view-root"') || !html.includes('id="auth-shell"') || !html.includes('/alpha.js')) {
   throw new Error("Build sanity check failed.");
 }
 
 console.log(`ORBITA build complete → ${out}`);
 console.log(cloud.configured
-  ? "Runtime mode: CLOUD ALPHA (validated + injected)"
+  ? "Runtime mode: PRIVATE ALPHA CLOUD (validated + injected)"
   : "Runtime mode: LOCAL ALPHA (backend adapters ready, cloud disabled by stage gate)");
