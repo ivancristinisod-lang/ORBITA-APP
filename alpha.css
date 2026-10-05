@@ -1,0 +1,13 @@
+/* ORBITA V0.7.0 Private Alpha — instrumentation UI only. */
+.sidebar-feedback{width:100%;min-height:48px;margin-top:8px;padding:8px 10px;border:1px solid #2f322d;background:#0c0e0c;color:#b7b2a8;display:grid;grid-template-columns:28px 1fr;gap:9px;align-items:center;text-align:left;cursor:pointer}
+.sidebar-feedback:hover{border-color:#58605a;color:#f0eadf}
+.feedback-dot{width:26px;height:26px;display:grid;place-items:center;border:1px solid #454941;color:#d9d2c4;font-weight:900}
+.sidebar-feedback>span:last-child{display:grid;gap:2px}
+.sidebar-feedback strong{font-size:8px;letter-spacing:.08em}
+.sidebar-feedback small{font-size:7px;color:#6f736c}
+.alpha-feedback-head p{max-width:470px}
+.alpha-feedback-privacy{margin:12px 0 0;color:#6e726b;font-size:8px;line-height:1.5}
+#alpha-feedback-status{align-self:center;color:#92978e;font-size:8px}
+.alpha-relevant-btn{margin-right:auto;border-color:#4b5522;color:#d9ff45}
+.alpha-relevant-btn:disabled{opacity:.7;cursor:default}
+@media(max-width:840px){.sidebar-feedback{min-height:44px}}
