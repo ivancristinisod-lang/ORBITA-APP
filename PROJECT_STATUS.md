@@ -1,93 +1,119 @@
 # ORBITA — Project Status
 
-**Product generation:** V0.6  
-**Patch:** 0.6.3 — Visual Finish  
-**Stage:** Functional Alpha / Pre-MVP → Experience validation  
+**Product generation:** V0.7  
+**Release:** 0.7.0-alpha.1 — Private Alpha Infrastructure  
+**Stage:** Private Alpha gate  
 **Frontend:** Vercel  
-**Backend-ready:** Supabase ORBITA (`sa-east-1`), desacoplado hasta activación  
+**Backend:** dedicated ORBITA Supabase required  
 **Primary user:** founders / entrepreneurs
 
-## V0.6.3 — visual finish
+## V0.7.0-alpha.1 — Private Alpha
 
-- [x] tutoriales contextuales removidos
-- [x] onboarding one-screen en desktop/notebook
-- [x] doble scroll del onboarding eliminado
-- [x] copy de entrada reducido y más escaneable
-- [x] escala tipográfica de HOY y onboarding compactada
-- [x] demo inmediata + objetivo primero preservados
-- [x] core relacional / datos / auth / cloud sin cambios funcionales
+### Implemented in code
 
-## V0.6.2 — first value
+- [x] invite-only tester registry
+- [x] Auth-level invite enforcement via database trigger
+- [x] respondent → tester → Auth user linkage without copying survey answers
+- [x] simulated respondents excluded from registry source types
+- [x] per-user workspace architecture preserved
+- [x] RLS / FORCE RLS for product workspace
+- [x] RLS / FORCE RLS for funnel events and tester feedback
+- [x] funnel events for activation and first value
+- [x] demo excluded from PMF product funnel
+- [x] operator-only PMF fields in tester registry
+- [x] minimal in-product feedback / bug reporting
+- [x] account deletion preserves research-level tester row but removes product data
+- [x] Private Alpha operator runbook
+- [x] Solana not a gate
 
-- [x] onboarding máximo 2 pasos
-- [x] demo inmediata en un click
-- [x] objetivo antes que identidad/perfil
-- [x] perfil diferido a DATOS
-- [x] empty states accionables
-- [x] más espacio entre superficies y márgenes laterales
-- [x] mobile mantiene composición compacta
-- [x] core relacional / datos / auth / cloud sin cambios funcionales
+### P0 before inviting tester #2
 
-## V0.6.1 — producto activo
+- [ ] regain operational access to the dedicated ORBITA Supabase project
+- [ ] apply canonical workspace migrations + Private Alpha migrations
+- [ ] deploy `delete-account` Edge Function with JWT verification
+- [ ] configure Auth Site URL / redirects / email confirmation
+- [ ] create the 2 invited tester rows
+- [ ] activate cloud stage in Vercel production variables
+- [ ] execute real signup/login with both testers
+- [ ] execute cross-user RLS attack in both directions
+- [ ] execute logout/login persistence test for both testers
+- [ ] execute account deletion test without impacting the other tester
 
-- [x] 4 rutas canónicas: Hoy, Personas, Red, Datos
-- [x] Agenda removida de navegación y superficie activa
-- [x] Meeting Brief removido de la UI
-- [x] creación/edición de meetings removida de la UI
-- [x] meetings históricos preservados a nivel de store para compatibilidad
-- [x] lenguaje visible “LOCAL” retirado como branding
-- [x] RED abre por objetivo cuando existe `currentGoal`
-- [x] HOY → RED activa explícitamente modo goal
-- [x] RED completa preservada como vista secundaria
-- [x] empty state fuerte cuando no existe objetivo
-- [x] PERSONAS con filas semánticas accesibles
-- [x] objetivo → evidencia → oportunidad → acción preservado
-- [x] CRUD de personas, interacciones, compromisos y oportunidades
-- [x] import/export JSON / CSV / Markdown
-- [x] persistencia y compatibilidad histórica
-- [x] onboarding goal-first
-- [x] responsive + reduced motion
+## Initial cohort
 
-## Legacy compatibility
+Private Alpha begins with exactly 2 invited human testers.
 
-`meetings[]` puede seguir existiendo en workspaces y backups anteriores.
+Customer Discovery records remain external evidence. Existing respondents do not repeat the survey; `survey_response_id` links the tester registry to the prior response.
 
-**Legacy compatibility — not an active V0.6.1 product surface.**
+No simulated row may be treated as a tester.
 
-No se realiza una migración destructiva para borrar esos datos.
+## Funnel required from day one
 
-## Backend preparado, no bloqueante
+Server-side:
 
-- [x] Supabase Auth adapter
-- [x] workspace cloud por usuario
-- [x] cache por usuario
-- [x] RLS + FORCE RLS
-- [x] optimistic concurrency
-- [x] eliminación de cuenta server-side
+- `tester_invited`
+- `account_created`
 
-## Gate antes de beta pública
+Client-side:
 
-- [ ] cloud activation QA real con dos usuarios
-- [ ] sync entre dispositivos
-- [ ] custom SMTP
-- [ ] CAPTCHA / Turnstile
-- [ ] MFA/2FA administrativa
-- [ ] Privacy Policy / Terms / retention
-- [ ] dominio productivo propio
-- [ ] analytics de activación/retención
+- `first_login`
+- `goal_created`
+- `first_person_created`
+- `third_person_created`
+- `first_opportunity_shown`
+- `opportunity_opened`
+- `opportunity_marked_relevant`
+- `action_started`
+- `return_session`
 
-## Intencionalmente diferido
+Manual PMF fields:
 
-- Calendar product surface
-- OAuth social
-- Gmail / Calendar / LinkedIn / WhatsApp ingestion
-- outreach automation
-- AI API externa
-- graph/vector DB
-- equipos colaborativos
+- `aha_moment`
+- `action_taken`
+- `outcome`
+- `qualitative_feedback`
+- `blocking_bug`
+- `status`
+
+## GO 2 → 5
+
+GO only if both initial testers complete:
+
+`signup/login → objective → people → opportunity → logout/login → persisted data`
+
+with zero P0 in:
+
+- Auth;
+- cross-user isolation;
+- data loss;
+- blocking crash.
+
+## GO 5 → 10/15
+
+GO when:
+
+- zero critical Auth/data bugs;
+- onboarding completion is observable;
+- persistence is stable;
+- funnel events are present;
+- tester drop-off is identifiable;
+- feedback works;
+- no cross-user access exists.
+
+Visual perfection is not a gate.
+
+## Intentionally deferred
+
+- public signup
 - billing
-- Realtime
+- Gmail / Calendar / LinkedIn / WhatsApp ingestion
+- external AI API
+- graph/vector DB
+- agents
+- teams
+- realtime
+- Solana completion as an Alpha blocker
 
 ## Prioridad #1
 
-**Validar si ORBITA ayuda a entender qué quiero lograr y qué relaciones de mi red pueden moverme hacia ese objetivo.**
+**Validar si ORBITA ayuda a entender qué quiero lograr y qué relaciones reales pueden moverme hacia ese objetivo — y si provoca una acción que probablemente no habría ocurrido sin ORBITA.**

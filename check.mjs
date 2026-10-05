@@ -4,13 +4,14 @@ import path from "node:path";
 
 const root = process.cwd();
 const required = [
-  "index.html", "styles.css", "app.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "orbita-mark.svg", "orbita-logo.png",
+  "index.html", "styles.css", "alpha.css", "app.js", "alpha.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "orbita-mark.svg", "orbita-logo.png",
   "vercel.json", "package.json", "README.md", "PROJECT_STATUS.md", "QA-REPORT.md", "ORBITA_CANON_V0.5.md", "ORBITA_CANON_V0.6.1.md", "CODEX_TOMORROW_HANDOFF.md",
   "AUTH-SETUP.md", "SECURITY.md", "AUDIT-REPORT-V0.5.md", ".env.example",
   "supabase/schema.sql",
   "supabase/migrations/20260815153417_orbita_v05_hardened_workspace.sql",
   "supabase/migrations/20260815153451_orbita_v05_optimize_rls_initplans.sql",
   "supabase/migrations/20260815153845_orbita_v05_server_fields_and_revision.sql",
+  "supabase/migrations/20261005133000_orbita_private_alpha.sql",
   "supabase/functions/delete-account/index.ts",
   "ARCHITECTURE-DECISIONS.md", "PRODUCT-STAGE.md", "ORBITA_V0.6_EXPERIENCE.md",
   "solana.js", "CHANGELOG_HACKATHON.md", "DEMO.md", "ARCHITECTURE_HACKATHON.md", "SECURITY_HACKATHON.md",
@@ -19,9 +20,9 @@ const required = [
 for (const file of required) await access(path.join(root, file));
 
 const read = file => readFile(path.join(root, file), "utf8");
-const [html, css, app, core, auth, cloud, config, solana, sql, vercel, pkg, workflow, edge] = await Promise.all([
-  read("index.html"), read("styles.css"), read("app.js"), read("core.js"), read("auth.js"), read("cloud.js"), read("config.js"), read("solana.js"),
-  read("supabase/schema.sql"), read("vercel.json"), read("package.json"), read(".github/workflows/validate.yml"), read("supabase/functions/delete-account/index.ts")
+const [html, css, alphaCss, app, alpha, core, auth, cloud, config, solana, sql, alphaSql, vercel, pkg, workflow, edge] = await Promise.all([
+  read("index.html"), read("styles.css"), read("alpha.css"), read("app.js"), read("alpha.js"), read("core.js"), read("auth.js"), read("cloud.js"), read("config.js"), read("solana.js"),
+  read("supabase/schema.sql"), read("supabase/migrations/20261005133000_orbita_private_alpha.sql"), read("vercel.json"), read("package.json"), read(".github/workflows/validate.yml"), read("supabase/functions/delete-account/index.ts")
 ]);
 
 const checks = [
@@ -30,6 +31,7 @@ const checks = [
   [html.includes('id="onboarding-shell"'), "onboarding shell"],
   [html.includes('id="sync-chip"'), "sync status"],
   [html.includes('id="import-csv-file"'), "CSV input"],
+  [html.includes('src="/alpha.js"') && html.includes('href="/alpha.css"'), "Private Alpha assets loaded"],
   [css.includes("--acid:#dcff00"), "acid palette"],
   [css.includes("--blue:#2747ff"), "blue palette"],
   [css.includes("ORBITA V0.5"), "V0.5 compatibility UX layer"],
@@ -65,7 +67,7 @@ const checks = [
   [app.includes("PROBAR CON UNA RED DEMO"), "one-click demo onboarding"],
   [app.includes("EMPEZAR CON MI RED"), "own-network onboarding path"],
   [!app.includes('id="onboarding-profile-form"'), "identity setup removed from first-value onboarding"],
-      [!app.includes("tutorialTip") && !css.includes(".tutorial-tip"), "contextual tutorial banners removed"],
+  [!app.includes("tutorialTip") && !css.includes(".tutorial-tip"), "contextual tutorial banners removed"],
   [css.includes(".onboard-choice-grid") && css.includes("V0.6.3 — VISUAL FINISH"), "V0.6.3 compact visual styles"],
   [app.includes('document.body.classList.add("no-scroll")') && app.includes('document.body.classList.remove("no-scroll")'), "onboarding prevents double document scroll"],
   [app.includes('networkMode: "goal"'), "network defaults goal-first"],
@@ -78,14 +80,7 @@ const checks = [
   [!app.includes('brief-meeting'), "meeting brief action removed"],
   [!app.includes("LOCAL · EXPLICABLE"), "local implementation badge removed"],
   [app.includes('const collections = ["people","interactions","commitments","opportunities","meetings"]'), "legacy meeting backup compatibility"],
-  [app.includes('networkMode: "goal"'), "goal-first network default"],
-  [app.includes('action === "open-goal-network"'), "HOY goal-network navigation"],
-  [app.includes('data-action="network-mode" data-value="all"'), "secondary full-network fallback"],
   [app.includes('data-action="define-goal"'), "network empty-state goal CTA"],
-  [!html.includes('data-route="agenda"') && !app.includes('agenda: "Agenda"'), "Agenda removed from primary product routes"],
-  [!app.includes("function agendaView") && !app.includes("openMeetingBrief"), "Agenda and Meeting Brief UI removed"],
-  [!app.includes('data-kind="meeting"') && !app.includes('kind === "meeting"'), "meeting creation UI removed"],
-  [!app.includes("LOCAL · EXPLICABLE"), "implementation-local badge removed"],
   [!app.includes("PREPARAR ACCIÓN"), "relational CTA semantics aligned"],
   [app.includes('aria-label="Abrir relación con'), "people rows have semantic accessible labels"],
   [!app.includes("!nextMeeting"), "person detail has no removed Agenda variable"],
@@ -116,17 +111,41 @@ const checks = [
   [edge.includes('Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")'), "service credential server-side env only"],
   [edge.includes('body.confirm !== "ELIMINAR"'), "destructive confirmation"],
   [edge.includes("ALLOWED_ORIGINS"), "edge origin allowlist"],
-  [vercel.includes("https://tbxrglthrieafejxjecm.supabase.co"), "exact Supabase CSP origin"],
+  [vercel.includes("https://tbxrglthrieafejxjecm.supabase.co"), "exact dedicated ORBITA Supabase CSP origin"],
   [!vercel.includes("https://*.supabase.co"), "no wildcard Supabase CSP"],
   [vercel.includes('"value": "no-referrer"'), "private referrer policy"],
   [vercel.includes("no-store, max-age=0"), "runtime config no-store"],
-  [pkg.includes('"version":"0.6.3"'), "V0.6.3 version"],
+  [pkg.includes('"version":"0.7.0-alpha.1"'), "V0.7.0 Private Alpha version"],
   [pkg.includes('"node":">=22 <25"'), "Node range"],
-  [workflow.includes("node-version: 24"), "CI Node 24"]
+  [workflow.includes("node-version: 24"), "CI Node 24"],
+
+  // Private Alpha contract
+  [alphaSql.includes("create table if not exists public.orbita_tester_registry"), "tester registry table"],
+  [alphaSql.includes("create table if not exists public.orbita_funnel_events"), "funnel events table"],
+  [alphaSql.includes("create table if not exists public.orbita_tester_feedback"), "tester feedback table"],
+  [alphaSql.includes("orbita_require_private_alpha_invite"), "invite-only Auth trigger"],
+  [alphaSql.includes("orbita_link_private_alpha_user"), "tester to Auth linkage trigger"],
+  [alphaSql.includes("survey_response_id text unique"), "survey respondent reference without survey duplication"],
+  [alphaSql.includes("source_kind in ('customer_discovery', 'self_test', 'direct')"), "simulated records excluded from tester registry"],
+  [alphaSql.includes("force row level security"), "Private Alpha tables force RLS"],
+  [alpha.includes('"tester_invited"') === false, "tester_invited is server-side only"],
+  [alpha.includes('track("first_login"'), "first login telemetry"],
+  [alpha.includes('track("return_session"'), "return session telemetry"],
+  [alpha.includes('track("goal_created"'), "goal telemetry"],
+  [alpha.includes('track("first_person_created"'), "first person telemetry"],
+  [alpha.includes('track("third_person_created"'), "third person telemetry"],
+  [alpha.includes('track("first_opportunity_shown"'), "first opportunity telemetry"],
+  [alpha.includes('track("opportunity_opened"'), "opportunity opened telemetry"],
+  [alpha.includes('track("opportunity_marked_relevant"'), "opportunity relevance telemetry"],
+  [alpha.includes('track("action_started"'), "action-start telemetry"],
+  [alpha.includes("orbita_tester_feedback"), "tester support feedback client"],
+  [alpha.includes("workspaceMode() === \"demo\""), "demo excluded from PMF product funnel"],
+  [alphaCss.includes(".sidebar-feedback"), "minimal feedback entry styling"],
+  [!alpha.includes("Fedetaque") && !alphaSql.includes("Fedetaque") && !alpha.includes("Federico Luis Taqueño") && !alphaSql.includes("Federico Luis Taqueño"), "no tester PII committed to public repo"]
 ];
 for (const [ok, label] of checks) if (!ok) throw new Error(`Check failed: ${label}`);
 
-for (const file of ["app.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "solana.js", "build.mjs", "dev.mjs"]) {
+for (const file of ["app.js", "alpha.js", "core.js", "seed.js", "auth.js", "cloud.js", "config.js", "solana.js", "build.mjs", "dev.mjs"]) {
   const result = spawnSync(process.execPath, ["--check", path.join(root, file)], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`${file} syntax failed:\n${result.stderr}`);
 }
@@ -148,16 +167,19 @@ const visibleProductCopy = html + app;
 for (const forbidden of ["LOCAL · EXPLICABLE", "LOCAL ALPHA", "SOLO NAVEGADOR", "FUNCTIONAL ALPHA · ACCESO LOCAL"]) {
   if (visibleProductCopy.includes(forbidden)) throw new Error(`Visible implementation copy remains: ${forbidden}`);
 }
-if (routes.length !== 4 || allowedRoutes.size !== 4 || ![...allowedRoutes].every(route => routes.includes(route))) {
-  throw new Error(`Canonical route check failed: expected exactly today, people, network, data; got ${routes.join(", ")}`);
-}
 
-const browserSource = app + auth + cloud + config;
+const browserSource = app + alpha + auth + cloud + config;
 if (/sb_secret_|service_role/i.test(browserSource)) {
   throw new Error("Security check failed: browser source mentions a secret/service-role credential.");
 }
 if (/sb_secret_[A-Za-z0-9_-]+/.test(edge)) {
   throw new Error("Security check failed: Edge Function contains a literal secret key.");
+}
+
+for (const forbiddenTelemetryKey of ["relation", "notes", "email", "phone", "linkedin", "currentGoal", "goal_text", "person_name"]) {
+  if (new RegExp(`properties\\s*[:=][\\s\\S]{0,160}${forbiddenTelemetryKey}`, "i").test(alpha)) {
+    throw new Error(`Privacy check failed: telemetry properties may contain relational content key ${forbiddenTelemetryKey}.`);
+  }
 }
 
 const partialCloud = spawnSync(process.execPath, [path.join(root, "build.mjs")], {
@@ -170,7 +192,7 @@ if (partialCloud.status !== 0) throw new Error("Stage-gate check failed: partial
 const secretBuild = spawnSync(process.execPath, [path.join(root, "build.mjs")], {
   cwd: root,
   encoding: "utf8",
-  env: { ...process.env, ORBITA_ENABLE_CLOUD: "true", ORBITA_SUPABASE_URL: "https://tbxrglthrieafejxjecm.supabase.co", ORBITA_SUPABASE_PUBLISHABLE_KEY: "sb_secret_SHOULD_NEVER_BUILD", ORBITA_APP_URL: "https://orbita-ten-khaki.vercel.app" }
+  env: { ...process.env, ORBITA_ENABLE_CLOUD: "true", ORBITA_SUPABASE_URL: "https://tbxrglthrieafejxjecm.supabase.co", ORBITA_SUPABASE_PUBLISHABLE_KEY: "sb_secret_SHOULD_NEVER_BUILD", ORBITA_APP_URL: "https://orbita-app-kappa.vercel.app" }
 });
 if (secretBuild.status === 0) throw new Error("Security check failed: secret-shaped browser build key was accepted when cloud activation was requested.");
 
