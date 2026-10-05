@@ -4,7 +4,7 @@ import { buildRelationalOpportunities } from "./core.js";
 
 const PRODUCT_VERSION = "0.7.0-alpha.1";
 const STORE_PREFIX = "orbita.store.v3";
-const ALPHA_MODE_KEY = "orbita.alpha.workspace-mode";
+const ALPHA_MODE_PREFIX = "orbita.alpha.workspace-mode";
 const SESSION_KEY = "orbita.alpha.session-id";
 const LAST_SESSION_PREFIX = "orbita.alpha.last-session";
 const SESSION_GAP_MS = 30 * 60 * 1000;
@@ -14,16 +14,19 @@ let activeSession = null;
 let activationBusy = false;
 
 function routeName() {
-  const route = (location.hash.match(/^#\/(today|people|network|data)/)?.[1] || "today").toLowerCase();
-  return route;
+  return (location.hash.match(/^#\/(today|people|network|data)/)?.[1] || "today").toLowerCase();
+}
+
+function workspaceModeKey() {
+  return `${ALPHA_MODE_PREFIX}.${activeUserId || "anonymous"}`;
 }
 
 function workspaceMode() {
-  return localStorage.getItem(ALPHA_MODE_KEY) || "real";
+  return localStorage.getItem(workspaceModeKey()) || "real";
 }
 
 function setWorkspaceMode(mode) {
-  localStorage.setItem(ALPHA_MODE_KEY, mode === "demo" ? "demo" : "real");
+  localStorage.setItem(workspaceModeKey(), mode === "demo" ? "demo" : "real");
 }
 
 function sessionId() {
@@ -258,7 +261,6 @@ async function markRelevant(button) {
   }
 }
 
-// Observe only UI shell changes. This adds PMF instrumentation without touching the product engine.
 const observer = new MutationObserver(() => {
   ensureFeedbackEntry();
   enhanceOpportunityDrawer();
